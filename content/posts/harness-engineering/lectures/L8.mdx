@@ -1,0 +1,9 @@
+---
+id: "L8"
+num: "Lecture 08"
+title: "Feature list là primitive của harness"
+lead: "Feature list là primitive của harness: scheduler/verifier/handoff đều dựa vào nó."
+r: "Vấn đề: Không có định nghĩa \"done\" => agent tự đặt chuẩn.\nÝ chính: Feature list là primitive của harness: scheduler/verifier/handoff đều dựa vào nó. / Mỗi item = (mô tả hành vi, lệnh verify, trạng thái)."
+note: "feature_list.json/yaml: not_started/active/blocked/passing."
+notes: "Nên làm: feature_list.json/yaml: not_started/active/blocked/passing. / Chỉ chuyển passing khi lệnh verify chạy thành công. | Sơ đồ: Feature -> Verify cmd -> State machine"
+---

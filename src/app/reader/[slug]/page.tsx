@@ -1,12 +1,15 @@
 // Server component: loads lectures at build time, passes to client view.
 import ReaderView from "./reader-view";
-import { getDecks, getLectures } from "@/lib/content";
+import { getLectures, getPosts } from "@/lib/content";
+
+export const dynamicParams = false;
 
 export function generateStaticParams() {
-  // Emit a reader page for each deck that has a linked post with lectures.
-  return getDecks()
-    .filter((d) => !d.placeholder && d.postSlug)
-    .map((d) => ({ slug: d.postSlug as string }));
+  // Emit a reader page for each non-placeholder post that actually has lectures.
+  return getPosts()
+    .filter((p) => !p.placeholder)
+    .filter((p) => getLectures(p.slug).length > 0)
+    .map((p) => ({ slug: p.slug }));
 }
 
 type Props = { params: Promise<{ slug: string }> };

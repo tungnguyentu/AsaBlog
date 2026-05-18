@@ -7,7 +7,9 @@ import {
   SpineDiagram3,
 } from "@/components/spine-diagrams";
 
-export function generateStaticParams() {
+export const dynamicParams = false;
+
+export const generateStaticParams = async () => {
   return getPosts()
     .filter((p) => !p.placeholder)
     .map((p) => ({ slug: p.slug }));
