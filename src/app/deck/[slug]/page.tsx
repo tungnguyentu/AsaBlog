@@ -2,7 +2,9 @@
 import DeckView from "./deck-view";
 import { getDecks, getSlides } from "@/lib/content";
 
-export function generateStaticParams() {
+export const dynamicParams = false;
+
+export async function generateStaticParams() {
   return getDecks()
     .filter((d) => !d.placeholder)
     .map((d) => ({ slug: d.slug }));
