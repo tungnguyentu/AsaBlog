@@ -1058,3 +1058,22 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 }
 .deck-dots span.active{ background: var(--accent); transform: scale(1.2); }
 .deck-dots span:hover{ background: var(--ink-soft); }
+
+/* ──── Vietnamese typography overrides ──── */
+/* Source Serif 4 italic conflicts with Vietnamese diacritics.
+   Switch all content italic-serif to upright sans when lang="vi". */
+:lang(vi) .hero h1 em,
+:lang(vi) .hero-sub,
+:lang(vi) .section-rule h2,
+:lang(vi) .post-excerpt,
+:lang(vi) .post-head .lede,
+:lang(vi) .reader-body p,
+:lang(vi) .reader-body p .lead,
+:lang(vi) .rn-note,
+:lang(vi) .rn-meta,
+:lang(vi) .about-body p,
+:lang(vi) .about-body p.lead,
+:lang(vi) .footnote {
+  font-family: var(--sans);
+  font-style: normal;
+}

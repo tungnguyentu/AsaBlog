@@ -16,8 +16,15 @@ const LangContext = createContext<LangContextValue>({
 
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Lang>("en");
+
+  function handleSetLang(next: Lang) {
+    setLang(next);
+    // sync <html lang="..."> so CSS :lang(vi) selectors fire
+    document.documentElement.lang = next;
+  }
+
   return (
-    <LangContext.Provider value={{ lang, setLang }}>
+    <LangContext.Provider value={{ lang, setLang: handleSetLang }}>
       {children}
     </LangContext.Provider>
   );
