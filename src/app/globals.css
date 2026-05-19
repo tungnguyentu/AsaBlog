@@ -1,26 +1,241 @@
 @import "tailwindcss";
 
+/* ── Design tokens — warm white default ─────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #fafaf7;
+  --ink: #111111;
+  --muted: #6b6b6b;
+  --rule: rgba(17, 17, 17, 0.14);
 }
 
+/* ── Palette overrides ──────────────────────────────────── */
+[data-theme="warm"] {
+  --paper: #fafaf7;
+  --ink: #111111;
+  --muted: #6b6b6b;
+  --rule: rgba(17, 17, 17, 0.14);
+}
+[data-theme="pure"] {
+  --paper: #ffffff;
+  --ink: #000000;
+  --muted: #666666;
+  --rule: rgba(0, 0, 0, 0.12);
+}
+[data-theme="newsprint"] {
+  --paper: #f1ede5;
+  --ink: #1a1a1a;
+  --muted: #777062;
+  --rule: rgba(26, 26, 26, 0.16);
+}
+[data-theme="dark"] {
+  --paper: #15161a;
+  --ink: #e8e6df;
+  --muted: #8a877d;
+  --rule: rgba(232, 230, 223, 0.18);
+}
+
+/* ── Font variable aliases ──────────────────────────────── */
+:root {
+  /* Vietnamese body — Lora has full Vietnamese diacritic support */
+  --font-serif: var(--font-lora), "Georgia", serif;
+  /* Vietnamese headings — Be Vietnam Pro is designed for Vietnamese */
+  --font-heading: var(--font-be-vietnam), "Segoe UI", sans-serif;
+  /* English-only display serif — used exclusively for the blog masthead */
+  --font-display: var(--font-dm-serif), "Playfair Display", Georgia, serif;
+  /* Code & metadata — Latin only, no Vietnamese content here */
+  --font-mono: var(--font-jetbrains-mono), "IBM Plex Mono", ui-monospace, monospace;
+}
+
+/* ── Tailwind theme ─────────────────────────────────────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Base ───────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Prose — Vietnamese body text ───────────────────────── */
+.prose {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  /* Vietnamese diacritics stack vertically — extra line-height prevents clipping */
+  line-height: 1.92;
+  color: var(--ink);
+}
+
+/* Headings use Be Vietnam Pro — designed for Vietnamese */
+.prose h2 {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 2.4rem 0 0.8rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule);
+  line-height: 1.4;
+}
+.prose h3 {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 1.8rem 0 0.5rem;
+  line-height: 1.4;
+}
+.prose h4 {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 1.4rem 0 0.4rem;
+  line-height: 1.4;
+}
+
+.prose p {
+  margin: 0 0 1.3em;
+}
+.prose a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--muted);
+}
+.prose a:hover {
+  text-decoration-color: var(--ink);
+}
+.prose blockquote {
+  border-left: 2px solid var(--ink);
+  margin: 1.8em 0;
+  padding: 0.5em 1.4em;
+  font-style: italic;
+  color: var(--muted);
+  line-height: 1.92;
+}
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+  background: var(--rule);
+  padding: 0.15em 0.4em;
+  border-radius: 2px;
+}
+.prose pre {
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+  background: var(--rule);
+  padding: 1.2em 1.5em;
+  overflow-x: auto;
+  border-radius: 2px;
+  margin: 1.8em 0;
+  line-height: 1.6;
+}
+.prose pre code {
+  background: none;
+  padding: 0;
+}
+.prose ol,
+.prose ul {
+  margin: 0 0 1.3em;
+  padding-left: 1.6em;
+}
+.prose li {
+  margin-bottom: 0.45em;
+  line-height: 1.92;
+}
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 2.4em 0;
+}
+.prose sup {
+  font-family: var(--font-mono);
+  font-size: 0.7em;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  cursor: default;
+}
+.prose img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1.8em 0;
+}
+
+/* Drop cap: DM Serif Display preserved on the decorative initial letter */
+.prose .drop-cap::first-letter {
+  font-family: var(--font-display);
+  font-size: 3.6rem;
+  float: left;
+  line-height: 0.88;
+  padding-right: 0.12em;
+  padding-top: 0.06em;
+  color: var(--ink);
+}
+
+/* ── Eyebrow label ──────────────────────────────────────── */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── Theme toggle ───────────────────────────────────────── */
+.theme-btn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.theme-btn:hover,
+.theme-btn[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+/* ── Search input ───────────────────────────────────────── */
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 4px;
+}
+.search-field input {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 100%;
+}
+.search-field input::placeholder {
+  color: var(--muted);
+}
+.search-field input:focus {
+  color: var(--ink);
 }
