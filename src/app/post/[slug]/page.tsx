@@ -25,26 +25,16 @@ export default async function PostPage({ params }: Props) {
   if (!post || post.placeholder) notFound();
 
   return (
-    <main className="page">
-      <div className="container narrow">
-        <nav className="crumbs">
-          <Link href="/">asa</Link>
-          <span className="sep">/</span>
-          <Link href="/">writing</Link>
-          <span className="sep">/</span>
-          <span style={{ color: "var(--ink)" }}>harness engineering</span>
-        </nav>
+    <main>
+      <Link className="back" href="/">← writing</Link>
 
-        <header className="post-head">
-          <div className="date">may 18 · 2026 · essay + deck</div>
-          <h1>Harness Engineering: twelve lectures on the loop.</h1>
-          <p className="lede">
-            A long-form study of agent harnesses — the scaffolding that turns a
-            model into a worker. Read it as <em>Reader &amp; Notes</em> with
-            three spine diagrams, or jump to the full text for lookup.
-          </p>
-        </header>
+      <header className="post-head">
+        <div className="meta">{post.dateLabel} · essay</div>
+        <h1>{post.title}</h1>
+        <p className="lede">{post.excerpt}</p>
+      </header>
 
+      <article className="body">
         <div className="reader-row">
           <Link
             className="reader-card"
@@ -63,7 +53,7 @@ export default async function PostPage({ params }: Props) {
               </span>
             </div>
           </Link>
-          <div className="reader-card" style={{ cursor: "default" }}>
+          <Link className="reader-card" href={`/full/${slug}/`}>
             <div className="kind">lookup</div>
             <div className="ttl">Full text</div>
             <div className="sub">
@@ -76,7 +66,7 @@ export default async function PostPage({ params }: Props) {
                 ›
               </span>
             </div>
-          </div>
+          </Link>
         </div>
 
         <section className="spines" style={{ counterReset: "spine" }}>
@@ -117,7 +107,7 @@ export default async function PostPage({ params }: Props) {
           <Link href="/">← back to writing</Link>
           <Link href="/reader/harness-engineering/">read full essay →</Link>
         </div>
-      </div>
+      </article>
     </main>
   );
 }

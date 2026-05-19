@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import Link from "next/link";
 import type { DeckSlide } from "@/lib/content";
 import { useLang } from "@/context/lang-context";
 
-type Props = { slides: DeckSlide[] };
+type Props = { slides: DeckSlide[]; title: string };
 
 const SLIDE_COPY = {
   en: {
@@ -42,10 +42,10 @@ function SlideBody({ slide, lang }: { slide: DeckSlide; lang: "en" | "vi" }) {
           <h1>{c.loop.h[0]}<em>{c.loop.h[1]}</em>{c.loop.h[2]}</h1>
           <div className="flow-row">
             {c.loop.nodes.map((node, i) => (
-              <>
-                <span key={node} className={"node" + (i >= 3 ? " strong" : "")}>{node}</span>
+              <Fragment key={node}>
+                <span className={"node" + (i >= 3 ? " strong" : "")}>{node}</span>
                 {i < c.loop.nodes.length - 1 && <span className="arr">→</span>}
-              </>
+              </Fragment>
             ))}
             <span className="arr">↺</span>
           </div>
@@ -80,7 +80,7 @@ function SlideBody({ slide, lang }: { slide: DeckSlide; lang: "en" | "vi" }) {
   }
 }
 
-export default function DeckPage({ slides }: Props) {
+export default function DeckPage({ slides, title }: Props) {
   const { lang } = useLang();
   const [idx, setIdx] = useState(0);
   const last = slides.length - 1;
@@ -113,80 +113,70 @@ export default function DeckPage({ slides }: Props) {
   }, []);
 
   return (
-    <main className="page">
-      <div className="container">
-        <nav className="crumbs">
-          <Link href="/">asa</Link>
-          <span className="sep">/</span>
-          <Link href="/decks/">decks</Link>
-          <span className="sep">/</span>
-          <span style={{ color: "var(--ink)" }}>harness engineering</span>
-        </nav>
+    <main>
+      <Link className="back" href="/decks/">← decks</Link>
 
-        <header className="post-head" style={{ paddingBottom: 20 }}>
-          <div className="date">
-            {lang === "vi"
-              ? `slide deck · ${slides.length} trang · ←/→ để điều hướng`
-              : `slide deck · ${slides.length} slides · ←/→ to navigate`}
+      <header className="post-head">
+        <div className="meta">
+          {lang === "vi"
+            ? `slide deck · ${slides.length} trang · ←/→ để điều hướng`
+            : `slide deck · ${slides.length} slides · ←/→ to navigate`}
+        </div>
+        <h1>{title} — slide deck.</h1>
+      </header>
+
+      <div className="deck-stage">
+        <div className="deck-frame">
+          {slides.map((s, i) => (
+            <section
+              key={i}
+              className={"slide" + (i === idx ? " active" : "")}
+              aria-hidden={i !== idx}
+            >
+              <div className="head">
+                <span>
+                  <span className="dot" />
+                  asa · {title.toLowerCase()}
+                </span>
+                <span>{s.n}</span>
+              </div>
+
+              <SlideBody slide={s} lang={lang} />
+
+              <div className="foot">
+                {/* foot is [string, string] in YAML — cast from unknown index signature */}
+                <span>{(s.foot as string[])[0]}</span>
+                <span>
+                  {i + 1} / {slides.length}
+                </span>
+                <span>{(s.foot as string[])[1]}</span>
+              </div>
+            </section>
+          ))}
+        </div>
+
+        <div className="deck-controls">
+          <button className="deck-btn" onClick={prev} disabled={idx === 0}>
+            ← prev
+          </button>
+          <div className="pager">
+            <span>
+              {String(idx + 1).padStart(2, "0")} /{" "}
+              {String(slides.length).padStart(2, "0")}
+            </span>
+            <span className="deck-dots" style={{ marginLeft: 14 }}>
+              {slides.map((_, i) => (
+                <span
+                  key={i}
+                  className={i === idx ? "active" : ""}
+                  onClick={() => setIdx(i)}
+                />
+              ))}
+            </span>
           </div>
-          <h1 style={{ fontSize: "clamp(28px, 3.6vw, 40px)", marginBottom: 8 }}>
-            Harness Engineering — slide deck.
-          </h1>
-        </header>
-
-        <div className="deck-stage">
-          <div className="deck-frame">
-            {slides.map((s, i) => (
-              <section
-                key={i}
-                className={"slide" + (i === idx ? " active" : "")}
-                aria-hidden={i !== idx}
-              >
-                <div className="head">
-                  <span>
-                    <span className="dot" />
-                    asa · harness eng.
-                  </span>
-                  <span>{s.n}</span>
-                </div>
-
-                <SlideBody slide={s} lang={lang} />
-
-                <div className="foot">
-                  {/* foot is [string, string] in YAML — cast from unknown index signature */}
-                  <span>{(s.foot as string[])[0]}</span>
-                  <span>
-                    {i + 1} / {slides.length}
-                  </span>
-                  <span>{(s.foot as string[])[1]}</span>
-                </div>
-              </section>
-            ))}
-          </div>
-
-          <div className="deck-controls">
-            <button className="deck-btn" onClick={prev} disabled={idx === 0}>
-              ← prev
-            </button>
-            <div className="pager">
-              <span>
-                {String(idx + 1).padStart(2, "0")} /{" "}
-                {String(slides.length).padStart(2, "0")}
-              </span>
-              <span className="deck-dots" style={{ marginLeft: 14 }}>
-                {slides.map((_, i) => (
-                  <span
-                    key={i}
-                    className={i === idx ? "active" : ""}
-                    onClick={() => setIdx(i)}
-                  />
-                ))}
-              </span>
-            </div>
-            <button className="deck-btn" onClick={next} disabled={idx === last}>
-              next →
-            </button>
-          </div>
+          <button className="deck-btn" onClick={next} disabled={idx === last}>
+            next →
+          </button>
         </div>
       </div>
     </main>

@@ -1,8 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState, useEffect, ReactNode } from "react";
-import { TopBar } from "./top-bar";
-import { SiteFoot } from "./site-foot";
 import { SearchOverlay } from "./search-overlay";
 import type { SearchItem } from "@/lib/content";
 
@@ -14,6 +14,7 @@ type Props = {
 
 export function SiteShell({ children, searchIndex, searchRecents }: Props) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const pathname = usePathname();
 
   // Global ⌘K / Ctrl+K / "/" shortcut
   useEffect(() => {
@@ -40,10 +41,35 @@ export function SiteShell({ children, searchIndex, searchRecents }: Props) {
   }, [searchOpen]);
 
   return (
-    <div className="shell">
-      <TopBar onOpenSearch={() => setSearchOpen(true)} />
+    <div className="wrap">
+      <header className="head">
+        <Link className="brand" href="/">
+          Asa<span className="dot" />
+          <span style={{ color: "var(--ink-soft)", fontStyle: "italic", fontSize: 15 }}>
+            journal
+          </span>
+        </Link>
+        <nav>
+          <Link href="/" aria-current={pathname === "/" ? "page" : undefined}>
+            writing
+          </Link>
+          <Link
+            href="/decks/"
+            aria-current={pathname.startsWith("/decks") || pathname.startsWith("/deck/") ? "page" : undefined}
+          >
+            decks
+          </Link>
+          <Link href="/about/">about</Link>
+        </nav>
+      </header>
+
       {children}
-      <SiteFoot />
+
+      <footer className="foot">
+        <span>asa.zentry.site</span>
+        <a href="#">rss</a>
+      </footer>
+
       <SearchOverlay
         open={searchOpen}
         onClose={() => setSearchOpen(false)}

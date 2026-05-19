@@ -15,5 +15,6 @@ type Props = { params: Promise<{ slug: string }> };
 export default async function DeckPage({ params }: Props) {
   const { slug } = await params;
   const slides = getSlides(slug);
-  return <DeckView slides={slides} />;
+  const deck = getDecks().find((d) => d.slug === slug);
+  return <DeckView slides={slides} title={deck?.title ?? slug} />;
 }

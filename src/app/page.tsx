@@ -1,8 +1,9 @@
-import { getPosts } from "@/lib/content";
+import { getPosts, getLectures } from "@/lib/content";
 import HomeView from "./home-view";
 
-// Server component: loads posts at build time, passes to client view.
+// Server component: loads posts + lecture count at build time.
 export default function HomePage() {
   const posts = getPosts();
-  return <HomeView posts={posts} />;
+  const lectureCount = getLectures("harness-engineering").length;
+  return <HomeView posts={posts} lectureCount={lectureCount} />;
 }

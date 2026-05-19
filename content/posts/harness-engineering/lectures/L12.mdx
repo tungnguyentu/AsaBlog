@@ -1,9 +1,317 @@
 ---
 id: "L12"
 num: "Lecture 12"
-title: "Mỗi phiên để lại trạng thái sạch"
-lead: "Clean state 5 chiều: build pass, test pass, progress ghi, không rác, đường khởi động rõ."
-r: "Vấn đề: Kết phiên để repo bẩn => phiên sau mất 30-60 phút dọn.\nÝ chính: Clean state 5 chiều: build pass, test pass, progress ghi, không rác, đường khởi động rõ. / Tư duy transaction: commit sạch hoặc rollback."
-note: "Checklist kết phiên + idempotent cleanup."
-notes: "Nên làm: Checklist kết phiên + idempotent cleanup. / Đảm bảo \"mở phiên mới chạy được ngay\". | Sơ đồ: End session: GREEN build/tests + updated artifacts + no junk"
+title_en: |
+  Clean Handoff at the End of Every Session
+title_vi: |
+  Bàn giao Sạch Sẽ ở Cuối Mỗi Phiên
+lead_en: |
+  Your agent runs all afternoon, modifies 20 files, commits the code, session ends.
+lead_vi: |
+  Agent của bạn chạy cả buổi chiều, sửa đổi 20 tệp, commit mã, phiên kết thúc.
+r_en: |
+  The next agent session starts and immediately discovers: build is broken, tests are red, temporary debug files are everywhere, the feature list wasn't updated, and progress is completely unclear. The new session spends its first 30 minutes just figuring out "what did the last session actually do." Both OpenAI and Anthropic state clearly: long-term reliability depends on operational discipline, not just single-run success.
+r_vi: |
+  Phiên agent tiếp theo bắt đầu và ngay lập tức phát hiện: build bị hỏng, test đang đỏ, các tệp debug tạm thời ở khắp nơi, feature list không được cập nhật, và tiến độ hoàn toàn không rõ ràng. Phiên mới dành 30 phút đầu tiên chỉ để tìm hiểu "phiên cuối thực sự đã làm gì." Cả OpenAI và Anthropic đều nói rõ ràng: độ tin cậy dài hạn phụ thuộc vào kỷ luật vận hành, không chỉ là thành công một lần chạy. Chất lượng trạng thái khi thoát phiên trực tiếp xác định hiệu quả của phiên tiếp theo.
+note_en: |
+  This is especially true for AI coding agents — every session introduces changes, and without cleanup at exit, technical debt accumulates exponentially.
+note_vi: |
+  Điều này đặc biệt đúng với AI coding agent — mỗi phiên giới thiệu các thay đổi, và nếu không dọn dẹp khi thoát, nợ kỹ thuật tích lũy theo cấp số nhân.
+full_en: |
+  > Code examples: code/ Practice project: Project 06. Complete harness (Capstone)
+
+
+  ## Lecture 12. Clean Handoff at the End of Every Session ​
+
+
+
+  ## What Problem Does This Lecture Solve? ​
+
+
+  Your agent runs all afternoon, modifies 20 files, commits the code, session ends. The next agent session starts and immediately discovers: build is broken, tests are red, temporary debug files are everywhere, the feature list wasn't updated, and progress is completely unclear. The new session spends its first 30 minutes just figuring out "what did the last session actually do."
+
+  Both OpenAI and Anthropic state clearly: long-term reliability depends on operational discipline, not just single-run success. The quality of state at session exit directly determines the next session's efficiency. Think of it like Git best practices — every commit should be an atomic, compilable change, not a pile of half-finished code.
+
+
+  ## Core Concepts ​
+
+
+  - Clean state : The system satisfies five conditions at session end — build passes, tests pass, progress recorded, no stale artifacts, startup path available. Missing any one means the session isn't "done."
+  - Session integrity : Analogous to database transactions — either fully commit and leave a clean state, or roll back to the last consistent state. No middle ground.
+  - Quality document : An active artifact that continuously records quality ratings for each module. Not a one-time assessment, but a tracker showing whether the codebase is getting stronger or weaker over time.
+  - Cleanup loop : A regular maintenance session aimed at systematically reducing entropy in the codebase. Not an emergency fix, but routine operations.
+  - Harness simplification : As model capabilities improve, periodically remove harness components that are no longer necessary. A constraint essential today may be unnecessary overhead in three months.
+  - Idempotent cleanup : Cleanup operations produce the same result regardless of how many times they run. Ensures cleanup remains safe even in failure-retry scenarios.
+
+
+  ## Five Dimensions of Clean State ​
+
+
+
+  ## Why This Happens ​
+
+
+
+  ## Entropy Growth Is the Default State ​
+
+
+  Lehman's laws of software evolution tell us: systems undergoing continuous change will inevitably increase in complexity unless actively managed. This is especially true for AI coding agents — every session introduces changes, and without cleanup at exit, technical debt accumulates exponentially.
+
+  Real data is telling. A project developed with agents for 12 weeks, without cleanup strategy:
+
+  - Week 1: Build pass rate 100%, test pass rate 100%, new session startup 5 min
+  - Week 4: Build 95%, tests 92%, startup 15 min
+  - Week 8: Build 82%, tests 78%, startup 35 min
+  - Week 12: Build 68%, tests 61%, startup 60+ min
+
+  Same project with a cleanup strategy:
+
+  - Week 1: 100%, 100%, 5 min
+  - Week 12: 97%, 95%, 9 min
+
+  After 12 weeks: build pass rate differs by 29 percentage points, new session startup time differs by 85%. This is not theoretical — it's an observed difference.
+
+
+  ## Five Dimensions of Clean State ​
+
+
+  Clean state isn't just "the code compiles." It's five dimensions evaluated together:
+
+  Build dimension : Does the code build without errors? This is the most basic — the next session shouldn't have to fix build errors first.
+
+  Test dimension : Do all tests pass? Including tests that existed before the session — the session is responsible for not breaking existing functionality. And it should be verified in CI, not just "works on my machine."
+
+  Progress dimension : Is current progress recorded in a machine-readable artifact? Completed subtasks with their passing criteria, in-progress but incomplete subtasks with current state, not-yet-started subtasks. Good progress records reduce 60-80% of session startup diagnostic time.
+
+  Artifact dimension : Are there stale or ambiguous temporary artifacts? Debug logs, temporary files, commented-out code, TODO markers — all of these increase cognitive load for the next session.
+
+  Startup dimension : Is the standard startup path available? Can the next session start working without manual intervention? Environment initialization, codebase loading, context acquisition, task selection — these paths must not be broken.
+
+
+  ## "Clean Up Later" Means Never Clean Up ​
+
+
+  The most common mental trap is "no time to clean up this session, I'll do it next time." But the next agent session doesn't know what you left behind — it sees a mess of code and uncertain state. It'll spend significant time inferring "which parts of this code are intentional and which are temporary."
+
+  Worse, every session has its own task objectives. The new session is there to do new work, not clean up the previous session's mess. It'll ignore the chaos and start new work on top of it, introducing more chaos on top of chaos. This is entropy's positive feedback loop.
+
+
+  ## How to Do It Right ​
+
+
+
+  ## 1. Clean State as a Completion Requirement ​
+
+
+  Define explicitly in the harness: session completion = task passes verification AND clean state check passes. Missing either one means the session isn't complete. Write in CLAUDE.md:
+
+  ## Session Exit Checklist - [ ] Build passes (npm run build) - [ ] All tests pass (npm test) - [ ] Feature list updated - [ ] No debug code remaining (console.log, debugger, TODO) - [ ] Standard startup path available (npm run dev) 2. Dual-Mode Cleanup Strategy ​ Combine two cleanup modes:
+
+  Immediate cleanup (at end of every session) : Clean up temporary artifacts created during the session, update feature list state, ensure build and tests pass. This is "reference counting" cleanup.
+
+  Periodic cleanup (weekly) : Full-system scan — handle accumulated structural issues, update quality documents, run benchmark tests to detect drift. This is "tracing" cleanup.
+
+
+  ## 3. Maintain a Quality Document ​
+
+
+  A quality document is an active artifact that continuously scores each module:
+
+  # Quality Document ## User Authentication Module (Quality: A) - Verification passing: Yes - Agent understandable: Yes - Test stability: Stable - Architecture boundaries: Compliant - Code conventions: Followed ## Payment Module (Quality: C) - Verification passing: Partial (payment callback untested) - Agent understandable: Difficult (logic spread across 3 files) - Test stability: Unstable (2 flaky tests) - Architecture boundaries: Violations present - Code conventions: Partially followed New sessions read this document and immediately know where to prioritize. Fix the lowest-scoring module first.
+
+
+  ## 4. Periodically Simplify the Harness ​
+
+
+  An important insight from Anthropic: every harness component exists because the model can't reliably do something on its own. But as models improve, these assumptions become outdated. A constraint essential three months ago may be unnecessary overhead today.
+
+  Recommended practice: Every month, pick one harness component, temporarily disable it, and run benchmark tasks. If results don't degrade, remove it permanently. If they do, restore it or replace with a lighter alternative.
+
+
+  ## 5. Cleanup Operations Must Be Idempotent ​
+
+
+  Cleanup scripts should be safe to run repeatedly:
+
+  # Idempotent cleanup operations rm -f /tmp/debug- * .log # -f ensures no error when files don't exist git checkout -- .env.local # Restore to known state npm run test # Verify cleanup didn't break anything Real-World Case ​ An Electron app developed with agents over 12 weeks, comparing two approaches:
+
+  Without cleanup strategy (control group): Week 12, build pass rate 68%, test pass rate 61%, new session startup 60+ min, stale artifacts 103.
+
+  With cleanup strategy (experimental group): Full clean-state check at every session end + weekly cleanup loop. Week 12, build pass rate 97%, test pass rate 95%, new session startup 9 min, stale artifacts 11.
+
+  By week 12, the experimental group's build pass rate is 29 percentage points higher, test pass rate 34 points higher, and new session startup time 85% lower.
+
+
+  ## Key Takeaways ​
+
+
+  - Clean state is a necessary condition for session completion — not optional housekeeping, but part of the "definition of done."
+  - All five dimensions are required — build, tests, progress, artifacts, startup — each must be explicitly checked.
+  - Quality documents make codebase health trackable — you can only fix what you know is degrading.
+  - Periodically simplify the harness — as model capabilities improve, remove constraints that are no longer needed.
+  - "Clean up later" equals never cleaning up — entropy growth is the default; only active cleanup counteracts it.
+
+
+  ## Further Reading ​
+
+
+  - Clean Code - Robert C. Martin — Systematic principles of code cleanliness
+  - Harness Engineering - OpenAI — Reproducibility as a core harness design requirement
+  - Effective Harnesses - Anthropic — The critical role of clean session exits for long-term reliability
+  - Programs, Life Cycles, and Laws of Software Evolution - Lehman — Software evolution laws proving system complexity inevitably grows without active maintenance
+
+
+  ## Exercises ​
+
+
+  - Clean State Checklist : Design a session exit checklist for your codebase covering all five dimensions. Apply it across 5 consecutive sessions and record violations per dimension.
+  - Benchmark Comparison : Use a fixed task set with two harness variants (with/without clean state requirements). Compare completion rate, retry count, and defect escape rate.
+  - Harness Simplification Practice : Pick one harness component, temporarily disable it, and run benchmark tasks. Compare results with and without it. Decide whether to keep, remove, or replace.
+full_vi: |
+  English Version → | 中文版本 →
+
+  > Ví dụ mã nguồn: code/ Dự án thực hành: Dự án 06. Harness Đầy đủ (Capstone)
+
+
+  ## Bài 12. Bàn giao Sạch Sẽ ở Cuối Mỗi Phiên ​
+
+
+
+  ## Bài giảng này Giải quyết Vấn đề Gì? ​
+
+
+  Agent của bạn chạy cả buổi chiều, sửa đổi 20 tệp, commit mã, phiên kết thúc. Phiên agent tiếp theo bắt đầu và ngay lập tức phát hiện: build bị hỏng, test đang đỏ, các tệp debug tạm thời ở khắp nơi, feature list không được cập nhật, và tiến độ hoàn toàn không rõ ràng. Phiên mới dành 30 phút đầu tiên chỉ để tìm hiểu "phiên cuối thực sự đã làm gì."
+
+  Cả OpenAI và Anthropic đều nói rõ ràng: độ tin cậy dài hạn phụ thuộc vào kỷ luật vận hành, không chỉ là thành công một lần chạy. Chất lượng trạng thái khi thoát phiên trực tiếp xác định hiệu quả của phiên tiếp theo. Hãy nghĩ về nó giống như các thực hành tốt nhất của Git — mỗi commit nên là một thay đổi nguyên tử, có thể biên dịch, không phải một đống mã làm dở.
+
+
+  ## Các Khái niệm Cốt lõi ​
+
+
+  - Trạng thái sạch (Clean state) : Hệ thống thỏa mãn năm điều kiện khi thoát phiên — build vượt qua, test vượt qua, tiến độ được ghi lại, không có artifact lỗi thời, đường dẫn khởi động khả dụng. Thiếu bất kỳ cái nào có nghĩa là phiên không "xong."
+  - Tính toàn vẹn phiên (Session Integrity) : Tương tự như giao dịch cơ sở dữ liệu — hoặc commit đầy đủ và để lại trạng thái sạch, hoặc rollback về trạng thái nhất quán cuối cùng. Không có lựa chọn trung gian.
+  - Tài liệu chất lượng (Quality Document) : Một artifact đang hoạt động liên tục ghi lại xếp loại chất lượng cho mỗi module. Không phải đánh giá một lần, mà là tracker cho thấy liệu codebase có đang trở nên mạnh hơn hay yếu hơn theo thời gian.
+  - Vòng lặp dọn dẹp (Cleanup Loop) : Một phiên bảo trì thường xuyên nhằm giảm entropy có hệ thống trong codebase. Không phải sửa chữa khẩn cấp, mà là vận hành thường xuyên.
+  - Đơn giản hóa harness (Harness Simplification) : Khi năng lực mô hình cải thiện, định kỳ xóa các thành phần harness không còn cần thiết. Một ràng buộc cần thiết ngày hôm nay có thể là overhead không cần thiết ba tháng sau.
+  - Dọn dẹp Idempotent : Các hoạt động dọn dẹp tạo ra cùng kết quả bất kể chúng chạy bao nhiêu lần. Đảm bảo dọn dẹp vẫn an toàn ngay cả trong các kịch bản thất bại-thử lại.
+
+
+  ## Năm Chiều của Trạng thái Sạch ​
+
+
+
+  ## Tại sao Điều này Xảy ra ​
+
+
+
+  ## Tăng trưởng Entropy là Trạng thái Mặc định ​
+
+
+  Các quy luật tiến hóa phần mềm của Lehman cho chúng ta biết: các hệ thống trải qua thay đổi liên tục sẽ không thể tránh khỏi tăng độ phức tạp trừ khi được quản lý chủ động. Điều này đặc biệt đúng với AI coding agent — mỗi phiên giới thiệu các thay đổi, và nếu không dọn dẹp khi thoát, nợ kỹ thuật tích lũy theo cấp số nhân.
+
+  Dữ liệu thực tế rất rõ ràng. Một dự án được phát triển với agent trong 12 tuần, không có chiến lược dọn dẹp:
+
+  - Tuần 1: Tỷ lệ vượt qua build 100%, tỷ lệ vượt qua test 100%, khởi động phiên mới 5 phút
+  - Tuần 4: Build 95%, test 92%, khởi động 15 phút
+  - Tuần 8: Build 82%, test 78%, khởi động 35 phút
+  - Tuần 12: Build 68%, test 61%, khởi động 60+ phút
+
+  Cùng dự án với chiến lược dọn dẹp:
+
+  - Tuần 1: 100%, 100%, 5 phút
+  - Tuần 12: 97%, 95%, 9 phút
+
+  Sau 12 tuần: tỷ lệ vượt qua build khác nhau 29 điểm phần trăm, thời gian khởi động phiên mới khác nhau 85%. Đây không phải lý thuyết — đây là sự khác biệt được quan sát.
+
+
+  ## Năm Chiều của Trạng thái Sạch ​
+
+
+  Trạng thái sạch không chỉ là "mã được biên dịch." Đó là năm chiều được đánh giá cùng nhau:
+
+  Chiều Build : Mã có build không có lỗi không? Đây là cơ bản nhất — phiên tiếp theo không nên phải sửa lỗi build trước tiên.
+
+  Chiều Test : Tất cả test có vượt qua không? Bao gồm cả test tồn tại trước phiên — phiên có trách nhiệm không làm hỏng chức năng hiện có. Và nó phải được xác minh trong CI, không chỉ "hoạt động trên máy của tôi."
+
+  Chiều Tiến độ : Tiến độ hiện tại có được ghi lại trong một artifact có thể đọc bởi máy không? Các subtask đã hoàn thành với tiêu chí vượt qua của chúng, các subtask đang tiến hành nhưng chưa hoàn thành với trạng thái hiện tại, các subtask chưa bắt đầu. Bản ghi tiến độ tốt giảm 60-80% thời gian chẩn đoán khởi động phiên.
+
+  Chiều Artifact : Có các artifact tạm thời hoặc mơ hồ lỗi thời không? Debug log, tệp tạm, mã bị comment out, marker TODO — tất cả những thứ này tăng tải nhận thức cho phiên tiếp theo.
+
+  Chiều Khởi động : Đường dẫn khởi động chuẩn có khả dụng không? Phiên tiếp theo có thể bắt đầu làm việc mà không cần can thiệp thủ công không? Khởi tạo môi trường, tải codebase, thu thập ngữ cảnh, lựa chọn tác vụ — các đường dẫn này không được bị hỏng.
+
+
+  ## "Dọn dẹp sau" Có nghĩa là Không bao giờ Dọn dẹp ​
+
+
+  Cái bẫy tâm lý phổ biến nhất là "không có thời gian dọn dẹp trong phiên này, tôi sẽ làm lần sau." Nhưng phiên agent tiếp theo không biết bạn đã để lại gì — nó thấy một mớ mã và trạng thái không chắc chắn. Nó sẽ dành nhiều thời gian để suy ra "phần nào của mã này là có chủ ý và phần nào là tạm thời."
+
+  Tệ hơn, mỗi phiên có mục tiêu tác vụ riêng của mình. Phiên mới ở đó để làm công việc mới, không phải dọn dẹp mớ bòng bong của phiên trước. Nó sẽ bỏ qua sự hỗn loạn và bắt đầu công việc mới trên đó, giới thiệu thêm hỗn loạn trên đỉnh hỗn loạn. Đây là vòng phản hồi tích cực của entropy.
+
+
+  ## Cách Làm Đúng ​
+
+
+
+  ## 1. Trạng thái Sạch như Yêu cầu Hoàn thành ​
+
+
+  Định nghĩa rõ ràng trong harness: hoàn thành phiên = tác vụ vượt qua xác minh VÀ kiểm tra trạng thái sạch vượt qua. Thiếu bất kỳ cái nào có nghĩa là phiên không hoàn thành. Viết trong CLAUDE.md:
+
+  ## Danh sách Kiểm tra Thoát Phiên - [ ] Build vượt qua (npm run build) - [ ] Tất cả test vượt qua (npm test) - [ ] Feature list đã được cập nhật - [ ] Không có mã debug còn lại (console.log, debugger, TODO) - [ ] Đường dẫn khởi động chuẩn khả dụng (npm run dev) 2. Chiến lược Dọn dẹp Hai Chế độ ​ Kết hợp hai chế độ dọn dẹp:
+
+  Dọn dẹp tức thì (ở cuối mỗi phiên) : Dọn dẹp các artifact tạm thời được tạo trong phiên, cập nhật trạng thái feature list, đảm bảo build và test vượt qua. Đây là dọn dẹp "tính tham chiếu."
+
+  Dọn dẹp định kỳ (hàng tuần) : Quét toàn hệ thống — xử lý các vấn đề cấu trúc tích lũy, cập nhật tài liệu chất lượng, chạy test benchmark để phát hiện trôi dạt. Đây là dọn dẹp "tracing."
+
+
+  ## 3. Duy trì Tài liệu Chất lượng ​
+
+
+  Tài liệu chất lượng là một artifact đang hoạt động liên tục tính điểm mỗi module:
+
+  # Tài liệu Chất lượng ## Module Xác thực Người dùng (Chất lượng: A) - Xác minh vượt qua: Có - Agent có thể hiểu: Có - Độ ổn định test: Ổn định - Ranh giới kiến trúc: Tuân thủ - Quy ước mã: Được tuân theo ## Module Thanh toán (Chất lượng: C) - Xác minh vượt qua: Một phần (payment callback chưa được test) - Agent có thể hiểu: Khó (logic trải rộng trên 3 tệp) - Độ ổn định test: Không ổn định (2 test flaky) - Ranh giới kiến trúc: Có vi phạm - Quy ước mã: Được tuân theo một phần Các phiên mới đọc tài liệu này và biết ngay nơi ưu tiên. Sửa module có điểm thấp nhất trước.
+
+
+  ## 4. Định kỳ Đơn giản hóa Harness ​
+
+
+  Một hiểu biết quan trọng từ Anthropic: mỗi thành phần harness tồn tại vì mô hình không thể thực hiện điều gì đó một cách đáng tin cậy. Nhưng khi các mô hình cải thiện, các giả định này trở nên lỗi thời. Một ràng buộc cần thiết ba tháng trước có thể là overhead không cần thiết ngày hôm nay.
+
+  Thực hành được khuyến nghị: Mỗi tháng, chọn một thành phần harness, tạm thời vô hiệu hóa nó, và chạy các tác vụ benchmark. Nếu kết quả không giảm sút, hãy xóa vĩnh viễn. Nếu có, hãy khôi phục hoặc thay thế bằng một thay thế nhẹ hơn.
+
+
+  ## 5. Các Hoạt động Dọn dẹp Phải là Idempotent ​
+
+
+  Script dọn dẹp phải an toàn để chạy lặp đi lặp lại:
+
+  # Các hoạt động dọn dẹp idempotent rm -f /tmp/debug- * .log # -f đảm bảo không có lỗi khi tệp không tồn tại git checkout -- .env.local # Khôi phục về trạng thái đã biết npm run test # Xác minh dọn dẹp không làm hỏng gì Trường hợp Thực tế ​ Một ứng dụng Electron được phát triển với agent trong 12 tuần, so sánh hai cách tiếp cận:
+
+  Không có chiến lược dọn dẹp (nhóm kiểm soát): Tuần 12, tỷ lệ vượt qua build 68%, tỷ lệ vượt qua test 61%, khởi động phiên mới 60+ phút, artifact lỗi thời 103.
+
+  Với chiến lược dọn dẹp (nhóm thực nghiệm): Kiểm tra trạng thái sạch đầy đủ ở cuối mỗi phiên + vòng lặp dọn dẹp hàng tuần. Tuần 12, tỷ lệ vượt qua build 97%, tỷ lệ vượt qua test 95%, khởi động phiên mới 9 phút, artifact lỗi thời 11.
+
+  Đến tuần 12, tỷ lệ vượt qua build của nhóm thực nghiệm cao hơn 29 điểm phần trăm, tỷ lệ vượt qua test cao hơn 34 điểm, và thời gian khởi động phiên mới thấp hơn 85%.
+
+
+  ## Những Điểm chính cần Nhớ ​
+
+
+  - Trạng thái sạch là điều kiện cần thiết cho hoàn thành phiên — không phải dọn dẹp tùy chọn, mà là một phần của "định nghĩa hoàn thành."
+  - Tất cả năm chiều đều bắt buộc — build, test, tiến độ, artifact, khởi động — mỗi cái phải được kiểm tra rõ ràng.
+  - Tài liệu chất lượng làm cho sức khỏe codebase có thể theo dõi — bạn chỉ có thể sửa những gì bạn biết đang suy giảm.
+  - Định kỳ đơn giản hóa harness — khi năng lực mô hình cải thiện, hãy xóa các ràng buộc không còn cần thiết.
+  - "Dọn dẹp sau" bằng với không bao giờ dọn dẹp — tăng trưởng entropy là mặc định; chỉ có dọn dẹp chủ động mới chống lại nó.
+
+
+  ## Đọc thêm ​
+
+
+  - Clean Code - Robert C. Martin — Các nguyên tắc có hệ thống về sự sạch sẽ của mã
+  - Harness Engineering - OpenAI — Khả năng tái tạo như một yêu cầu thiết kế harness cốt lõi
+  - Effective Harnesses - Anthropic — Vai trò quan trọng của thoát phiên sạch cho độ tin cậy dài hạn
+  - Programs, Life Cycles, and Laws of Software Evolution - Lehman — Các quy luật tiến hóa phần mềm chứng minh độ phức tạp hệ thống tất yếu tăng mà không có bảo trì chủ động
+  - Danh sách Kiểm tra Trạng thái Sạch : Thiết kế một danh sách kiểm tra thoát phiên cho codebase của bạn bao phủ tất cả năm chiều. Áp dụng nó qua 5 phiên liên tiếp và ghi lại vi phạm theo từng chiều.
+  - So sánh Benchmark : Sử dụng một bộ tác vụ cố định với hai biến thể harness (có/không có yêu cầu trạng thái sạch). So sánh tỷ lệ hoàn thành, số lần thử lại và tỷ lệ thoát lỗi.
+  - Thực hành Đơn giản hóa Harness : Chọn một thành phần harness, tạm thời vô hiệu hóa nó, và chạy các tác vụ benchmark. So sánh kết quả có và không có nó. Quyết định có giữ, xóa hay thay thế.
 ---

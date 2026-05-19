@@ -1,9 +1,235 @@
 ---
 id: "L8"
 num: "Lecture 08"
-title: "Feature list là primitive của harness"
-lead: "Feature list là primitive của harness: scheduler/verifier/handoff đều dựa vào nó."
-r: "Vấn đề: Không có định nghĩa \"done\" => agent tự đặt chuẩn.\nÝ chính: Feature list là primitive của harness: scheduler/verifier/handoff đều dựa vào nó. / Mỗi item = (mô tả hành vi, lệnh verify, trạng thái)."
-note: "feature_list.json/yaml: not_started/active/blocked/passing."
-notes: "Nên làm: feature_list.json/yaml: not_started/active/blocked/passing. / Chỉ chuyển passing khi lệnh verify chạy thành công. | Sơ đồ: Feature -> Verify cmd -> State machine"
+title_en: |
+  Use Feature Lists to Constrain What the Agent Does
+title_vi: |
+  Sử dụng Feature List để Ràng buộc những gì Agent Làm
+lead_en: |
+  You ask an agent to build an e-commerce site.
+lead_vi: |
+  Bạn yêu cầu một agent xây dựng một trang web thương mại điện tử.
+r_en: |
+  After it finishes, it tells you "done." You look at the code — user authentication works, but the checkout button in the shopping cart does nothing, and the payment flow isn't connected at all. The problem: you never told it what "done" means, so it used its own standard — "I wrote a lot of code and it looks fairly complete." Feature lists, in many people's eyes, are just a memo — write things down so you don't forget, then toss it aside.
+r_vi: |
+  Sau khi nó hoàn thành, nó nói với bạn "xong." Bạn nhìn vào mã — xác thực người dùng hoạt động, nhưng nút thanh toán trong giỏ hàng không làm gì cả, và luồng thanh toán hoàn toàn không được kết nối. Vấn đề: bạn không bao giờ nói với nó "xong" có nghĩa là gì, vì vậy nó đã sử dụng tiêu chuẩn của riêng mình — "tôi đã viết nhiều mã và nó trông khá đầy đủ." Feature list, theo mắt nhiều người, chỉ là một ghi chú nhắc nhở — viết mọi thứ xuống để không quên, sau đó để sang một bên.
+note_en: |
+  Feature state must live in a machine-readable file in the repo, not in unstructured conversation text.
+note_vi: |
+  Trạng thái tính năng phải sống trong một tệp có thể đọc bởi máy trong repo, không phải trong văn bản hội thoại không có cấu trúc.
+full_en: |
+  > Code examples: code/ Practice project: Project 04. Runtime feedback and scope control
+
+
+  ## Lecture 08. Use Feature Lists to Constrain What the Agent Does ​
+
+
+  You ask an agent to build an e-commerce site. After it finishes, it tells you "done." You look at the code — user authentication works, but the checkout button in the shopping cart does nothing, and the payment flow isn't connected at all. The problem: you never told it what "done" means, so it used its own standard — "I wrote a lot of code and it looks fairly complete."
+
+  Feature lists, in many people's eyes, are just a memo — write things down so you don't forget, then toss it aside. But in the harness world, a feature list isn't a memo for humans — it's the backbone of the entire harness. The scheduler relies on it to pick tasks, the verifier relies on it to judge completion, the handoff reporter relies on it to generate summaries. Break the backbone and the whole body is paralyzed.
+
+  Both Anthropic and OpenAI emphasize: artifacts must be externalized. Feature state must live in a machine-readable file in the repo, not in unstructured conversation text.
+
+
+  ## Agents Don't Know What "Done" Means ​
+
+
+  Neither Claude Code nor Codex automatically knows what you mean by "done." You say "add a shopping cart feature," and the model's interpretation might be "write a Cart component and an addToCart method." But you meant "the user can browse products, add to cart, and complete checkout end-to-end." This understanding gap persists without a feature list. The agent uses its own implicit standard — usually "the code has no obvious syntax errors." What you need is end-to-end behavioral verification. Like asking a friend to buy you fruit — you say "get some fruit" and they come back with lemons. Their fruit and your fruit are not the same fruit.
+
+  Look at this common progress note:
+
+  Did user auth, shopping cart mostly done, still need payments Can a new agent session answer these questions from this note? What does "mostly done" mean? Which tests did the cart pass? What's blocking payments? The answer to all is "nobody knows." Like telling your doctor "my stomach hurts, been okay lately" — what medicine can they prescribe?
+
+  The result: the new session spends 20 minutes inferring project state, and may re-implement completed features. Anthropic's engineering data shows that good progress records reduce session startup diagnostic time by 60-80%.
+
+
+  ## Feature State Machine ​
+
+
+
+  ## Core Concepts ​
+
+
+  - Feature lists are harness primitives : Not "optional planning tools," but foundational data structures that all other harness components depend on. Like database table structures — you can't say "let's skip primary keys."
+  - Triple structure : Each feature item is a (behavior description, verification command, current state) triple. Missing any element makes the item incomplete.
+  - State machine model : Each feature item has four states — not_started , active , blocked , passing . State transitions are controlled by the harness, not freely changed by the agent.
+  - Pass-state gating : The only way a feature moves from active to passing is by verification command executing successfully. This is irreversible — once passing , it can't go back. Like passing an exam means you passed, you can't retroactively change the score.
+  - Single source of truth : All information about "what needs to be done" must derive from one feature list. No contradictions between the feature list and conversation history.
+  - Back-pressure : The number of features that haven't passed yet is the pressure the harness exerts on the agent. Zero pressure = project complete.
+
+
+  ## Why Feature Lists Must Be "Primitives" ​
+
+
+  Documents are for humans to read; primitives are for systems to execute. Documents can be ignored; primitives can't be bypassed.
+
+  Think of it like database trigger constraints vs. application-layer checks: the former is enforced by the database engine, no SQL can skip it; the latter depends on application code correctness and can be accidentally bypassed. Feature lists as harness primitives are Specifically, the feature list serves four harness components:
+
+  - Scheduler : Reads states, picks the next not_started feature. Like a factory production planning system.
+  - Verifier : Executes verification commands, decides whether to allow state transitions. Like quality inspection.
+  - Handoff reporter : Automatically generates session handoff summaries from the feature list. Like an automatic shift-change report.
+  - Progress tracker : Tallies state distribution, provides project health metrics. Like a dashboard.
+
+
+  ## How to Do It Right ​
+
+
+
+  ## 1. Define a Minimal Feature List Format ​
+
+
+  You don't need a complex system — a structured Markdown or JSON file works. The key is every entry must have the triple:
+
+  { "id" : "F03" , "behavior" : "POST /cart/items with {product_id, quantity} returns 201" , "verification" : "curl -X POST http://localhost:3000/api/cart/items -H 'Content-Type: application/json' -d '{ \" product_id \" :1, \" quantity \" :2}' | jq .status == 201" , "state" : "passing" , "evidence" : "commit abc123, test output log" } 2. Let the Harness Control State Transitions ​ The agent can't directly change a feature's state to passing . It can only submit a verification request; the harness executes the verification command and decides whether to allow the transition. This is "pass-state gating."
+
+
+  ## 3. Write the Rules in CLAUDE.md ​
+
+
+  ## Feature List Rules - Feature list file: /docs/features.md - Only one feature active at a time - Verification command must pass before marking as passing - Don't modify feature list states yourself — the verification script updates them automatically 4. Calibrate Granularity ​ Each feature item should be scoped to "completable in one session." Too broad and it won't finish; too narrow and the management overhead grows. "User can add items to cart" is good granularity. "Implement the shopping cart" is too broad. "Create the name field on the Cart model" is too narrow. Like cutting a steak — not the whole piece, and not ground meat.
+
+
+  ## Real-World Case ​
+
+
+  An e-commerce platform with 10 features. Two tracking approaches compared:
+
+  Memo mode : Agent uses unstructured notes. After 3 sessions, notes become "did user auth and product list, shopping cart mostly done but has bugs, payments not started." New session needs 20 minutes to infer state, ultimately re-implements completed features. Like your shopping list saying "milk, bread, and that thing" — at the store, you still don't know what to buy.
+
+  Backbone mode : Every feature has a clear state and verification command. New session reads the feature list and in 3 minutes knows: F01-F05 are passing , F06 is active , F07-F10 are not_started . Picks up from F06 directly, zero rework.
+
+  Quantified result: projects using structured feature lists show 45% higher feature completion rate than free-form tracking, with zero duplicate implementations.
+
+
+  ## Key Takeaways ​
+
+
+  - Feature lists are the harness's backbone , not memos for humans. Scheduler, verifier, and handoff reporter all depend on them.
+  - Every feature item must have the triple : behavior description + verification command + current state. Missing one element makes it incomplete — like a three-legged stool missing a leg.
+  - State transitions are controlled by the harness — the agent can't change states on its own. Passing verification = the only upgrade path.
+  - The feature list is the project's single source of truth — all "what to do" information derives from one list.
+  - Calibrate granularity to "completable in one session."
+
+
+  ## Further Reading ​
+
+
+  - Building Effective Agents - Anthropic — Explicitly identifies feature list as the "core data structure" for controlling agent scope
+  - Harness Engineering - OpenAI — Emphasizes the principle of "externalizing artifacts"
+  - Design by Contract - Bertrand Meyer — Contract design principles, the theoretical foundation of feature lists
+  - How Google Tests Software — Test pyramid and behavioral specification engineering practices
+
+
+  ## Exercises ​
+
+
+  - Feature List Design : Define a minimal feature list JSON schema. Include: id, behavior description, verification command, current state, evidence reference. Use it to describe a real project with 5 features.
+  - Verification Strictness Comparison : Pick 3 features and design both a "loose" verification (e.g., "code has no syntax errors") and a "strict" verification (e.g., "end-to-end test passes"). Compare false positive rate under each approach.
+  - Single Source Principle Audit : Review an existing agent project and check for scope information that contradicts the feature list (implicit requirements in conversations, TODO comments in code, etc.). Design a plan to unify all information into the feature list.
+full_vi: |
+  English Version → | 中文版本 →
+
+  > Ví dụ mã nguồn: code/ Dự án thực hành: Dự án 04. Phản hồi Runtime và Kiểm soát Phạm vi
+
+
+  ## Bài 08. Sử dụng Feature List để Ràng buộc những gì Agent Làm ​
+
+
+  Bạn yêu cầu một agent xây dựng một trang web thương mại điện tử. Sau khi nó hoàn thành, nó nói với bạn "xong." Bạn nhìn vào mã — xác thực người dùng hoạt động, nhưng nút thanh toán trong giỏ hàng không làm gì cả, và luồng thanh toán hoàn toàn không được kết nối. Vấn đề: bạn không bao giờ nói với nó "xong" có nghĩa là gì, vì vậy nó đã sử dụng tiêu chuẩn của riêng mình — "tôi đã viết nhiều mã và nó trông khá đầy đủ."
+
+  Feature list, theo mắt nhiều người, chỉ là một ghi chú nhắc nhở — viết mọi thứ xuống để không quên, sau đó để sang một bên. Nhưng trong thế giới harness, feature list không phải là ghi chú cho con người — nó là xương sống của toàn bộ harness. Bộ lập lịch phụ thuộc vào nó để chọn tác vụ, bộ xác minh phụ thuộc vào nó để đánh giá hoàn thành, trình báo cáo bàn giao phụ thuộc vào nó để tạo tóm tắt. Phá vỡ xương sống và toàn bộ cơ thể bị tê liệt.
+
+  Cả Anthropic và OpenAI đều nhấn mạnh: các artifact phải được ngoại hóa. Trạng thái tính năng phải sống trong một tệp có thể đọc bởi máy trong repo, không phải trong văn bản hội thoại không có cấu trúc.
+
+
+  ## Agent Không Biết "Xong" Có nghĩa là Gì ​
+
+
+  Cả Claude Code lẫn Codex đều không tự động biết ý bạn là gì khi nói "xong." Bạn nói "thêm tính năng giỏ hàng," và sự diễn giải của mô hình có thể là "viết một Cart component và một addToCart method." Nhưng ý bạn là "người dùng có thể duyệt sản phẩm, thêm vào giỏ hàng, và hoàn thành thanh toán end-to-end." Khoảng cách hiểu biết này tồn tại mãi mà không có feature list. Agent sử dụng tiêu chuẩn ẩn của riêng mình — thường là "mã không có lỗi cú pháp rõ ràng." Những gì bạn cần là xác minh hành vi end-to-end. Giống như nhờ bạn mua hoa quả — bạn nói "lấy vài thứ hoa quả" và họ về với chanh. Hoa quả của họ và hoa quả của bạn không phải là cùng loại hoa quả.
+
+  Nhìn vào ghi chú tiến độ phổ biến này:
+
+  Đã làm xác thực người dùng, giỏ hàng hầu như xong, vẫn cần thanh toán Một phiên agent mới có thể trả lời những câu hỏi này từ ghi chú này không? "Hầu như xong" có nghĩa là gì? Test nào giỏ hàng đã vượt qua? Điều gì đang chặn thanh toán? Câu trả lời cho tất cả là "không ai biết." Giống như nói với bác sĩ "bụng tôi đau, gần đây ổn hơn" — họ có thể kê thuốc gì?
+
+  Kết quả: phiên mới dành 20 phút để suy ra trạng thái dự án, và có thể triển khai lại các tính năng đã hoàn thành. Dữ liệu kỹ thuật của Anthropic cho thấy bản ghi tiến độ tốt giảm thời gian chẩn đoán khởi động phiên 60-80%.
+
+
+  ## Máy trạng thái Tính năng ​
+
+
+
+  ## Các Khái niệm Cốt lõi ​
+
+
+  - Feature list là nguyên lý cơ bản của harness : Không phải "công cụ lập kế hoạch tùy chọn," mà là cấu trúc dữ liệu nền tảng mà tất cả các thành phần harness khác phụ thuộc vào. Giống như cấu trúc bảng cơ sở dữ liệu — bạn không thể nói "hãy bỏ qua khóa chính."
+  - Cấu trúc ba yếu tố : Mỗi mục tính năng là một bộ ba (mô tả hành vi, lệnh xác minh, trạng thái hiện tại) . Thiếu bất kỳ yếu tố nào làm cho mục không đầy đủ.
+  - Mô hình máy trạng thái : Mỗi mục tính năng có bốn trạng thái — not_started , active , blocked , passing . Chuyển đổi trạng thái được kiểm soát bởi harness, không được thay đổi tự do bởi agent.
+  - Gating trạng thái vượt qua (Pass-state gating) : Cách duy nhất một tính năng chuyển từ active sang passing là thực thi thành công lệnh xác minh. Điều này không thể đảo ngược — một khi passing , nó không thể quay lại. Giống như vượt qua bài thi có nghĩa là bạn đã qua, bạn không thể hồi tố thay đổi điểm.
+  - Nguồn sự thật duy nhất : Tất cả thông tin về "những gì cần làm" phải bắt nguồn từ một feature list. Không có mâu thuẫn giữa feature list và lịch sử hội thoại.
+  - Áp lực ngược (Back-pressure) : Số lượng tính năng chưa vượt qua là áp lực mà harness tác dụng lên agent. Áp lực bằng không = dự án hoàn thành.
+
+
+  ## Tại sao Feature List Phải là "Nguyên lý Cơ bản" ​
+
+
+  Tài liệu là để con người đọc; nguyên lý cơ bản là để hệ thống thực thi. Tài liệu có thể bị bỏ qua; nguyên lý cơ bản không thể bị vượt qua.
+
+  Nghĩ về nó như ràng buộc trigger cơ sở dữ liệu vs. kiểm tra lớp ứng dụng: cái trước được thực thi bởi engine cơ sở dữ liệu, không có SQL nào có thể bỏ qua nó; cái sau phụ thuộc vào tính đúng đắn của mã ứng dụng và có thể vô tình bị vượt qua. Feature list như nguyên lý cơ bản harness phục vụ bốn thành phần harness cụ thể:
+
+  - Bộ lập lịch (Scheduler) : Đọc trạng thái, chọn tính năng not_started tiếp theo. Giống như hệ thống lập kế hoạch sản xuất nhà máy.
+  - Bộ xác minh (Verifier) : Thực thi lệnh xác minh, quyết định có cho phép chuyển đổi trạng thái không. Giống như kiểm tra chất lượng.
+  - Trình báo cáo bàn giao (Handoff Reporter) : Tự động tạo tóm tắt bàn giao phiên từ feature list. Giống như báo cáo ca tự động.
+  - Trình theo dõi tiến độ (Progress Tracker) : Đếm phân phối trạng thái, cung cấp số liệu sức khỏe dự án. Giống như dashboard.
+
+
+  ## Cách Làm Đúng ​
+
+
+
+  ## 1. Định nghĩa Định dạng Feature List Tối giản ​
+
+
+  Bạn không cần một hệ thống phức tạp — một tệp Markdown hoặc JSON có cấu trúc là đủ. Điều quan trọng là mỗi mục phải có bộ ba:
+
+  { "id" : "F03" , "behavior" : "POST /cart/items với {product_id, quantity} trả về 201" , "verification" : "curl -X POST http://localhost:3000/api/cart/items -H 'Content-Type: application/json' -d '{ \" product_id \" :1, \" quantity \" :2}' | jq .status == 201" , "state" : "passing" , "evidence" : "commit abc123, test output log" } 2. Để Harness Kiểm soát Chuyển đổi Trạng thái ​ Agent không thể trực tiếp thay đổi trạng thái của tính năng thành passing . Nó chỉ có thể gửi yêu cầu xác minh; harness thực thi lệnh xác minh và quyết định có cho phép chuyển đổi không. Đây là "pass-state gating."
+
+
+  ## 3. Viết Quy tắc trong CLAUDE.md ​
+
+
+  ## Quy tắc Feature List - Tệp feature list: /docs/features.md - Chỉ một tính năng active tại một thời điểm - Lệnh xác minh phải vượt qua trước khi đánh dấu là passing - Đừng tự mình sửa đổi trạng thái feature list — script xác minh cập nhật chúng tự động 4. Hiệu chỉnh Độ hạt ​ Mỗi mục tính năng phải có phạm vi "có thể hoàn thành trong một phiên." Quá rộng thì không xong; quá hẹp thì overhead quản lý tăng lên. "Người dùng có thể thêm mục vào giỏ hàng" là độ hạt tốt. "Triển khai giỏ hàng" là quá rộng. "Tạo trường tên trên Cart model" là quá hẹp. Giống như cắt bít tết — không phải cả miếng, và cũng không phải thịt băm.
+
+
+  ## Trường hợp Thực tế ​
+
+
+  Một nền tảng thương mại điện tử với 10 tính năng. Hai cách tiếp cận theo dõi được so sánh:
+
+  Chế độ ghi chú nhắc nhở : Agent sử dụng ghi chú không có cấu trúc. Sau 3 phiên, ghi chú trở thành "đã làm xác thực người dùng và danh sách sản phẩm, giỏ hàng hầu như xong nhưng có lỗi, thanh toán chưa bắt đầu." Phiên mới cần 20 phút để suy ra trạng thái, cuối cùng triển khai lại các tính năng đã hoàn thành. Giống như danh sách mua sắm của bạn nói "sữa, bánh mì và cái đó" — ở cửa hàng, bạn vẫn không biết mua gì.
+
+  Chế độ xương sống : Mỗi tính năng có trạng thái và lệnh xác minh rõ ràng. Phiên mới đọc feature list và trong 3 phút biết: F01-F05 là passing , F06 là active , F07-F10 là not_started . Tiếp tục từ F06 trực tiếp, không có làm lại nào.
+
+  Kết quả định lượng: các dự án sử dụng feature list có cấu trúc cho thấy tỷ lệ hoàn thành tính năng cao hơn 45% so với theo dõi tự do, với zero triển khai trùng lặp.
+
+
+  ## Những Điểm chính cần Nhớ ​
+
+
+  - Feature list là xương sống của harness , không phải ghi chú cho con người. Bộ lập lịch, bộ xác minh và trình báo cáo bàn giao đều phụ thuộc vào chúng.
+  - Mỗi mục tính năng phải có bộ ba : mô tả hành vi + lệnh xác minh + trạng thái hiện tại. Thiếu một yếu tố thì không đầy đủ — giống như ghế ba chân thiếu một chân.
+  - Chuyển đổi trạng thái được kiểm soát bởi harness — agent không thể tự mình thay đổi trạng thái. Vượt qua xác minh = con đường nâng cấp duy nhất.
+  - Feature list là nguồn sự thật duy nhất của dự án — tất cả thông tin "phải làm gì" đều bắt nguồn từ một danh sách.
+  - Hiệu chỉnh độ hạt thành "có thể hoàn thành trong một phiên."
+
+
+  ## Đọc thêm ​
+
+
+  - Building Effective Agents - Anthropic — Xác định rõ ràng feature list là "cấu trúc dữ liệu cốt lõi" để kiểm soát phạm vi agent
+  - Harness Engineering - OpenAI — Nhấn mạnh nguyên tắc "ngoại hóa artifact"
+  - Design by Contract - Bertrand Meyer — Nguyên tắc thiết kế hợp đồng, nền tảng lý thuyết của feature list
+  - How Google Tests Software — Tháp kiểm thử và thực hành kỹ thuật đặc tả hành vi
+  - Thiết kế Feature List : Định nghĩa một JSON schema feature list tối giản. Bao gồm: id, mô tả hành vi, lệnh xác minh, trạng thái hiện tại, tham chiếu bằng chứng. Sử dụng nó để mô tả một dự án thực tế với 5 tính năng.
+  - So sánh Độ khắt khe Xác minh : Chọn 3 tính năng và thiết kế cả xác minh "lỏng" (ví dụ: "mã không có lỗi cú pháp") và xác minh "nghiêm" (ví dụ: "test end-to-end vượt qua"). So sánh tỷ lệ dương tính giả dưới mỗi cách tiếp cận.
+  - Kiểm toán Nguyên tắc Nguồn duy nhất : Xem xét một dự án agent hiện có và kiểm tra thông tin phạm vi mâu thuẫn với feature list (yêu cầu ẩn trong hội thoại, chú thích TODO trong mã, v.v.). Thiết kế kế hoạch để hợp nhất tất cả thông tin vào feature list.
 ---

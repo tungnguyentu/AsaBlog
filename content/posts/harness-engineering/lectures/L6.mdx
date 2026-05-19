@@ -1,9 +1,231 @@
 ---
 id: "L6"
 num: "Lecture 06"
-title: "Init phải là một pha riêng"
-lead: "Init tối ưu cho độ ổn định (build/test), Implement tối ưu cho feature."
-r: "Vấn đề: Trộn init và implement => vừa làm nền vừa xây nhà, hiệu quả thấp.\nÝ chính: Init tối ưu cho độ ổn định (build/test), Implement tối ưu cho feature. / Trộn sẽ tạo \"unverified accumulation\" (code viết khi chưa có verify)."
-note: "Pha Init: làm cho lệnh build/test/lint chạy xanh."
-notes: "Nên làm: Pha Init: làm cho lệnh build/test/lint chạy xanh. / Pha Implement: chỉ làm feature sau khi init xong. | Sơ đồ: Init (nền móng) -> Implement (xây tường)"
+title_en: |
+  Initialize Before Every Agent Session
+title_vi: |
+  Khởi tạo Trước Mỗi Phiên Agent
+lead_en: |
+  You start a new agent session and say "add a search feature." It jumps straight into coding — admirable enthusiasm.
+lead_vi: |
+  Bạn bắt đầu một phiên agent mới và nói "thêm tính năng tìm kiếm." Nó nhảy thẳng vào việc lập trình — sự nhiệt tình đáng ngưỡng mộ.
+r_en: |
+  After 20 minutes it discovers the test framework isn't configured properly, spends another 10 fixing that, then the database migration script format is wrong, more fiddling. The search feature eventually gets added, but the whole session was inefficient — most time went to "figuring out how this project works" rather than writing the search feature.
+r_vi: |
+  Sau 20 phút, nó phát hiện ra khung test chưa được cấu hình đúng, dành thêm 10 phút để sửa cái đó, sau đó định dạng script migration cơ sở dữ liệu sai, loay hoay thêm. Tính năng tìm kiếm cuối cùng được thêm vào, nhưng toàn bộ phiên không hiệu quả — hầu hết thời gian dành cho "tìm hiểu dự án này hoạt động như thế nào" thay vì viết tính năng tìm kiếm.
+note_en: |
+  This lecture explains why initialization must be a separate phase, not mixed in with implementation.
+note_vi: |
+  Bài giảng này giải thích tại sao khởi tạo phải là một giai đoạn riêng, không được trộn lẫn với triển khai.
+full_en: |
+  > Code examples: code/ Practice project: Project 03. Multi-session continuity
+
+
+  ## Lecture 06. Initialize Before Every Agent Session ​
+
+
+  You start a new agent session and say "add a search feature." It jumps straight into coding — admirable enthusiasm. After 20 minutes it discovers the test framework isn't configured properly, spends another 10 fixing that, then the database migration script format is wrong, more fiddling. The search feature eventually gets added, but the whole session was inefficient — most time went to "figuring out how this project works" rather than writing the search feature.
+
+  The better approach: before letting the agent start working, use a separate phase to get the base environment ready, verification commands passing, and project structure understood. It's like building a house — you don't pour the foundation and put up walls simultaneously. If you do, the walls go up before the foundation has cured, and the whole building has to be torn down and started over. Pour the foundation first, let it cure, then build the walls — clean and efficient.
+
+  This lecture explains why initialization must be a separate phase, not mixed in with implementation.
+
+
+  ## Foundation and Walls: Two Fundamentally Different Jobs ​
+
+
+  Initialization and implementation have completely different optimization targets. The implementation phase optimizes for: maximizing the quantity and quality of verified features. The initialization phase optimizes for: maximizing the reliability and efficiency of all subsequent implementation.
+
+  When you mix initialization and implementation, the agent faces a multi-objective optimization problem — simultaneously building infrastructure and writing feature code. Without explicit priority setting, the agent naturally gravitates toward writing code (because that's directly visible output) while sacrificing infrastructure (because its value only shows in subsequent sessions). It's like telling a construction crew to simultaneously pour the foundation and build the walls — they'll probably rush to build walls because walls are visible and demonstrable. But a house with a bad foundation has systemic problems down the line.
+
+
+  ## Initialization Lifecycle ​
+
+
+
+  ## What Happens When You Mix Them ​
+
+
+  The most direct problem: the foundation doesn't set properly. The agent spends 80% of its effort on feature code and 20% casually setting up some infrastructure. The test framework is configured but never verified, lint rules are set but too loose, no progress file created. These defects aren't obvious in the first session (because the agent still remembers what it did), but they surface in the second session — the new agent doesn't know how to run, test, or where things stand. Shoddy foundation, shaky building.
+
+  A more hidden cost is "unverified accumulation" — feature code written before the test framework is configured is code without verification. When you finally go back to add tests for that code, you might discover the design was wrong from the start — had you known, you would have implemented it differently. Like tiling over wet concrete — when you discover the floor isn't level, all the tiles have to be pried up and redone.
+
+  Session budget is being wasted too. Initialization work (configuring environments, setting up tests, understanding project structure) consumes significant budget, leaving less for actual feature implementation. Result: the first session only completes half the features, and the second session has to start over understanding the project. Budget spent on the foundation, but the foundation isn't solid either — neither goal achieved.
+
+  The most easily overlooked problem is implicit assumption landmines. Decisions the agent makes during initialization (which test framework, how to organize directories, dependency management) — if not explicitly recorded, subsequent sessions can't understand these choices. Worse, subsequent sessions might make contradictory choices. The first construction crew used a concrete foundation, the second crew doesn't know and drove wooden pilings into it — the foundation cracks.
+
+  Anthropic's long-running application development research explicitly recommends separating initialization from implementation. Their experimental data: projects using a dedicated initialization phase showed 31% higher feature completion rates in multi-session scenarios compared to mixed approaches. The key insight — time invested in the initialization phase is fully recovered in the next 3-4 sessions. The more solid the foundation, the faster the walls go up.
+
+  OpenAI's Codex harness engineering guide also emphasizes the "repository as operational record" principle — establish clear operational structure from the first run, or every new session has to re-infer project conventions.
+
+
+  ## Core Concepts ​
+
+
+  - Initialization Phase : The first phase in the agent's lifecycle — no feature implementation, only establishing prerequisites for all subsequent implementation phases. The output isn't code, it's infrastructure.
+  - Bootstrap Contract : The conditions under which a project can be unambiguously operated by a fresh agent session — can start, can test, can see progress, can pick up next steps. Four conditions, all required.
+  - Cold Start vs Warm Start : Cold start is from an empty directory where the agent must guess project structure; warm start is from a template or existing project where infrastructure is already in place. Warm start far outperforms cold start — like starting work on a site with running water and electricity versus beginning from a barren wasteland.
+  - Handoff Readiness : The project is in a state at any given moment where a fresh agent can take over. No verbal explanation needed — just repo contents.
+  - Time to First Verification : The time from project start until the first feature point passes verification. This is the core metric for measuring initialization efficiency.
+  - Downstream Usability : The best measure of initialization quality — the proportion of subsequent sessions that can successfully execute tasks without relying on implicit knowledge.
+
+
+  ## How to Do Initialization Right ​
+
+
+  Treat initialization as a dedicated phase. The first session does only initialization — no business feature code at all. Initialization produces:
+
+  1. Runnable environment. The project starts, dependencies are installed, no environment issues. Foundation poured, no cracks.
+
+  2. Verifiable test framework. At least one example test passes. This proves the test framework itself is properly configured — like standing a pillar on the foundation to prove it can bear weight.
+
+  3. Bootstrap contract document. A clear document telling subsequent sessions:
+
+  # Initialization Contract ## Start Commands - Install dependencies: `make setup` - Start dev server: `make dev` - Run tests: `make test` - Full verification: `make check` ## Current State - All dependencies installed and locked - Test framework configured (Vitest + React Testing Library) - Example test passing (1/1) - Lint rules configured (ESLint + Prettier) ## Project Structure - src/ — Source code - src/components/ — React components - src/api/ — API client - tests/ — Test files 4. Task breakdown. Split the entire project into an ordered task list, each task with clear acceptance criteria:
+
+  # Task Breakdown ## Task 1: User Authentication Basics - Implement JWT auth middleware - Add login/register endpoints - Acceptance: pytest tests/test_auth.py all passing ## Task 2: User Profile Page - Implement user profile CRUD - Add profile edit form - Acceptance: pytest tests/test_profile.py all passing ## Task 3: Search Feature - ... 5. Git commit as checkpoint. After initialization completes, commit a clean checkpoint. All subsequent work starts from this checkpoint.
+
+  Warm start strategy : Don't start from an empty directory. Use a project template (create-react-app, fastapi-template, etc.) to preset standard directory structure, dependency configuration, and test framework. Bake common initialization steps into the template, leaving only project-specific initialization work. Like starting work on a site with running water and electricity — ten thousand times better than beginning from a barren wasteland.
+
+  Initialization completion criteria : Not "how much code was written," but whether the bootstrap contract's four conditions are met — can start, can test, can see progress, can pick up next steps. Use this checklist to validate initialization:
+
+  ## Initialization Acceptance Checklist - [ ] `make setup` succeeds from scratch - [ ] `make test` has at least one passing test - [ ] A new agent session can answer "how to run" and "how to test" from repo contents alone - [ ] Task breakdown file exists with at least 3 tasks - [ ] Everything committed to git Real-World Example ​ Two initialization approaches for a React frontend project:
+
+  Mixed approach (pouring foundation and building walls simultaneously) : The agent simultaneously created project scaffolding and implemented the first feature in session 1. At session end, the repo had runnable code but: no explicit start/test command documentation, no progress tracking file, no task breakdown. Session 2 spent ~20 minutes inferring project structure, test framework, and build process — like a new construction crew arriving at a site, not knowing how far the foundation got or where the plumbing runs are, having to dig holes one by one to find out.
+
+  Dedicated initialization (foundation first) : Session 1 did only initialization — created directory structure from a template, configured the test framework (Vitest + React Testing Library), wrote and verified one example test, created the bootstrap contract document and task breakdown file, committed the initial checkpoint. Session 2's rebuild time was under 3 minutes, and it started working directly from the task list — the crew arrives, glances at the blueprint, and knows exactly where to pick up.
+
+  Full project cycle comparison: the mixed approach's total rebuild time (across all sessions) was ~60% more than the dedicated initialization approach. The extra 20 minutes spent on initialization was recovered many times over in subsequent sessions. Like a solid foundation making the walls go up faster — slow is fast.
+
+
+  ## Key Takeaways ​
+
+
+  - Initialization and implementation have different optimization targets — mixing them just drags both down. Pour the foundation first, then build the walls.
+  - Initialization's output isn't code, it's infrastructure: runnable environment, verifiable tests, bootstrap contract, task breakdown.
+  - Validate initialization with the bootstrap contract's four conditions: can start, can test, can see progress, can pick up next steps.
+  - Warm start beats cold start. Use project templates to preset standardized infrastructure.
+  - Time invested in initialization is fully recovered in the next 3-4 sessions. This isn't extra cost — it's upfront investment. The more solid the foundation, the faster the building goes up.
+
+
+  ## Further Reading ​
+
+
+  - Anthropic: Effective Harnesses for Long-Running Agents
+  - OpenAI: Harness Engineering
+  - HumanLayer: Harness Engineering for Coding Agents
+  - Infrastructure as Code — Martin Fowler
+  - SWE-agent: Agent-Computer Interfaces
+
+
+  ## Exercises ​
+
+
+  - Bootstrap contract design : Write a complete bootstrap contract for a project you're developing. Then open a completely fresh agent session, show it only repo contents (no verbal context), and have it try to start the project, run tests, and understand current progress. Record every problem it encounters — each one corresponds to a missing clause in your bootstrap contract.
+  - Comparison experiment : Pick a moderately complex new project. Approach A: let the agent initialize and do first implementation simultaneously. Approach B: spend one session on dedicated initialization, start implementation in session 2. After 4 sessions, compare: time to first verification, rebuild cost, feature completion rate.
+  - Initialization acceptance checklist : Design an initialization acceptance checklist for your project. Have a fresh agent session execute each checklist item and record which pass and which fail. The failing items are where your harness needs strengthening.
+full_vi: |
+  English Version → | 中文版本 →
+
+  > Ví dụ mã nguồn: code/ Dự án thực hành: Dự án 03. Tính liên tục đa phiên
+
+
+  ## Bài 06. Khởi tạo Trước Mỗi Phiên Agent ​
+
+
+  Bạn bắt đầu một phiên agent mới và nói "thêm tính năng tìm kiếm." Nó nhảy thẳng vào việc lập trình — sự nhiệt tình đáng ngưỡng mộ. Sau 20 phút, nó phát hiện ra khung test chưa được cấu hình đúng, dành thêm 10 phút để sửa cái đó, sau đó định dạng script migration cơ sở dữ liệu sai, loay hoay thêm. Tính năng tìm kiếm cuối cùng được thêm vào, nhưng toàn bộ phiên không hiệu quả — hầu hết thời gian dành cho "tìm hiểu dự án này hoạt động như thế nào" thay vì viết tính năng tìm kiếm.
+
+  Cách tiếp cận tốt hơn: trước khi để agent bắt đầu làm việc, sử dụng một giai đoạn riêng để chuẩn bị môi trường cơ sở, các lệnh xác minh vượt qua, và cấu trúc dự án được hiểu. Giống như xây nhà — bạn không đổ móng và dựng tường cùng một lúc. Nếu bạn làm vậy, tường dựng lên trước khi móng đã đông cứng, và cả tòa nhà phải bị phá đi và bắt đầu lại. Đổ móng trước, để móng đông cứng, rồi xây tường — sạch sẽ và hiệu quả.
+
+  Bài giảng này giải thích tại sao khởi tạo phải là một giai đoạn riêng, không được trộn lẫn với triển khai.
+
+
+  ## Móng và Tường: Hai Công việc Khác Nhau Về Bản chất ​
+
+
+  Khởi tạo và triển khai có mục tiêu tối ưu hóa hoàn toàn khác nhau. Giai đoạn triển khai tối ưu hóa cho: tối đa hóa số lượng và chất lượng của các tính năng được xác minh. Giai đoạn khởi tạo tối ưu hóa cho: tối đa hóa độ tin cậy và hiệu quả của tất cả các triển khai tiếp theo.
+
+  Khi bạn trộn khởi tạo và triển khai, agent đối mặt với bài toán tối ưu hóa đa mục tiêu — đồng thời xây dựng cơ sở hạ tầng và viết mã tính năng. Không có cài đặt ưu tiên rõ ràng, agent tự nhiên nghiêng về viết mã (vì đó là kết quả có thể nhìn thấy trực tiếp) trong khi hy sinh cơ sở hạ tầng (vì giá trị của nó chỉ hiện ra trong các phiên sau). Giống như nói với đội xây dựng đồng thời đổ móng và xây tường — họ có thể sẽ vội vàng xây tường vì tường có thể nhìn thấy và trình diễn được. Nhưng một ngôi nhà có móng tệ có vấn đề hệ thống về sau.
+
+
+  ## Vòng đời Khởi tạo ​
+
+
+
+  ## Điều Gì Xảy ra Khi Bạn Trộn Chúng ​
+
+
+  Vấn đề trực tiếp nhất: móng không đông cứng đúng cách. Agent dành 80% công sức cho mã tính năng và 20% tùy tiện thiết lập một số cơ sở hạ tầng. Khung test được cấu hình nhưng không bao giờ được xác minh, quy tắc lint được thiết lập nhưng quá lỏng, không có tệp tiến độ được tạo. Những khiếm khuyết này không rõ ràng trong phiên đầu tiên (vì agent vẫn nhớ những gì nó đã làm), nhưng chúng nổi lên trong phiên thứ hai — agent mới không biết cách chạy, test, hoặc mọi thứ đang ở đâu. Móng cẩu thả, tòa nhà lung lay.
+
+  Một chi phí ẩn hơn là "tích lũy chưa xác minh" — mã tính năng được viết trước khi khung test được cấu hình là mã không có xác minh. Khi bạn cuối cùng quay lại thêm test cho mã đó, bạn có thể phát hiện ra thiết kế ngay từ đầu đã sai — nếu biết trước, bạn đã triển khai khác đi. Giống như lát gạch lên bê tông ướt — khi bạn phát hiện ra sàn không phẳng, tất cả gạch phải được cạy lên và làm lại.
+
+  Ngân sách phiên cũng đang bị lãng phí. Công việc khởi tạo (cấu hình môi trường, thiết lập test, hiểu cấu trúc dự án) tiêu thụ ngân sách đáng kể, để lại ít hơn cho việc triển khai tính năng thực tế. Kết quả: phiên đầu chỉ hoàn thành một nửa tính năng, và phiên thứ hai phải bắt đầu lại hiểu dự án. Ngân sách dành cho móng, nhưng móng cũng không vững — không mục tiêu nào đạt được.
+
+  Vấn đề dễ bị bỏ qua nhất là bẫy giả định ẩn. Các quyết định mà agent đưa ra trong quá trình khởi tạo (khung test nào, cách tổ chức thư mục, quản lý phụ thuộc) — nếu không được ghi lại rõ ràng, các phiên sau không thể hiểu những lựa chọn này. Tệ hơn, các phiên sau có thể đưa ra các lựa chọn mâu thuẫn. Đội xây dựng đầu tiên dùng móng bê tông, đội thứ hai không biết và đóng cọc gỗ vào đó — móng nứt.
+
+  Nghiên cứu phát triển ứng dụng chạy lâu của Anthropic đặc biệt khuyến nghị tách khởi tạo khỏi triển khai. Dữ liệu thực nghiệm của họ: các dự án sử dụng giai đoạn khởi tạo riêng biệt cho thấy tỷ lệ hoàn thành tính năng cao hơn 31% trong các kịch bản đa phiên so với các cách tiếp cận hỗn hợp. Hiểu biết chính — thời gian đầu tư vào giai đoạn khởi tạo được thu hồi hoàn toàn trong 3-4 phiên tiếp theo. Móng càng vững, tường xây càng nhanh.
+
+  Hướng dẫn harness engineering Codex của OpenAI cũng nhấn mạnh nguyên tắc "kho lưu trữ là bản ghi hoạt động" — thiết lập cấu trúc hoạt động rõ ràng từ lần chạy đầu tiên, hoặc mọi phiên mới phải suy ra lại các quy ước dự án.
+
+
+  ## Các Khái niệm Cốt lõi ​
+
+
+  - Giai đoạn Khởi tạo : Giai đoạn đầu tiên trong vòng đời của agent — không triển khai tính năng, chỉ thiết lập các điều kiện tiên quyết cho tất cả các giai đoạn triển khai tiếp theo. Kết quả không phải là mã, mà là cơ sở hạ tầng.
+  - Bootstrap Contract : Các điều kiện mà một dự án có thể được vận hành không mơ hồ bởi một phiên agent mới — có thể bắt đầu, có thể test, có thể thấy tiến độ, có thể chọn bước tiếp theo. Bốn điều kiện, tất cả đều cần thiết.
+  - Khởi động Lạnh vs. Khởi động Ấm (Cold Start vs. Warm Start) : Khởi động lạnh là từ một thư mục trống nơi agent phải đoán cấu trúc dự án; khởi động ấm là từ một mẫu hoặc dự án hiện có nơi cơ sở hạ tầng đã có sẵn. Khởi động ấm vượt trội hơn nhiều so với khởi động lạnh — giống như bắt đầu làm việc trên công trường có nước chạy và điện so với bắt đầu từ vùng đất hoang.
+  - Sẵn sàng Bàn giao (Handoff Readiness) : Dự án ở trạng thái tại bất kỳ thời điểm nào mà một agent mới có thể tiếp quản. Không cần giải thích bằng lời — chỉ cần nội dung repo.
+  - Thời gian Đến Xác minh Đầu tiên (Time to First Verification) : Thời gian từ khi bắt đầu dự án đến khi điểm tính năng đầu tiên vượt qua xác minh. Đây là chỉ số cốt lõi để đo hiệu quả khởi tạo.
+  - Khả năng Sử dụng Downstream : Thước đo tốt nhất về chất lượng khởi tạo — tỷ lệ các phiên tiếp theo có thể thực thi thành công các tác vụ mà không cần dựa vào kiến thức ẩn.
+
+
+  ## Cách Khởi tạo Đúng ​
+
+
+  Coi khởi tạo là một giai đoạn riêng biệt. Phiên đầu tiên chỉ làm khởi tạo — hoàn toàn không có mã tính năng kinh doanh. Khởi tạo tạo ra:
+
+  1. Môi trường có thể chạy. Dự án khởi động, dependencies được cài đặt, không có vấn đề môi trường. Móng được đổ, không có vết nứt.
+
+  2. Khung test có thể xác minh. Ít nhất một test mẫu vượt qua. Điều này chứng minh bản thân khung test được cấu hình đúng — giống như đứng một cột trên móng để chứng minh nó có thể chịu được trọng lượng.
+
+  3. Tài liệu bootstrap contract. Một tài liệu rõ ràng cho các phiên sau:
+
+  # Khởi tạo Contract ## Lệnh Khởi động - Cài đặt dependencies: `make setup` - Khởi động dev server: `make dev` - Chạy test: `make test` - Xác minh đầy đủ: `make check` ## Trạng thái Hiện tại - Tất cả dependencies đã được cài đặt và khóa - Khung test được cấu hình (Vitest + React Testing Library) - Test mẫu vượt qua (1/1) - Quy tắc lint được cấu hình (ESLint + Prettier) ## Cấu trúc Dự án - src/ — Mã nguồn - src/components/ — React components - src/api/ — API client - tests/ — Tệp test 4. Phân chia tác vụ. Chia toàn bộ dự án thành danh sách tác vụ có thứ tự, mỗi tác vụ có tiêu chí chấp nhận rõ ràng:
+
+  # Phân chia Tác vụ ## Tác vụ 1: Xác thực Người dùng Cơ bản - Triển khai JWT auth middleware - Thêm endpoint đăng nhập/đăng ký - Chấp nhận: pytest tests/test_auth.py tất cả vượt qua ## Tác vụ 2: Trang Hồ sơ Người dùng - Triển khai CRUD hồ sơ người dùng - Thêm form chỉnh sửa hồ sơ - Chấp nhận: pytest tests/test_profile.py tất cả vượt qua ## Tác vụ 3: Tính năng Tìm kiếm - ... 5. Git commit như checkpoint. Sau khi khởi tạo hoàn thành, commit một checkpoint sạch. Tất cả công việc tiếp theo bắt đầu từ checkpoint này.
+
+  Chiến lược khởi động ấm : Đừng bắt đầu từ một thư mục trống. Sử dụng mẫu dự án (create-react-app, fastapi-template, v.v.) để đặt trước cấu trúc thư mục chuẩn, cấu hình phụ thuộc và khung test. Nướng các bước khởi tạo thông thường vào mẫu, chỉ để lại công việc khởi tạo cụ thể cho dự án. Giống như bắt đầu làm việc trên công trường có nước chạy và điện — tốt hơn mười nghìn lần so với bắt đầu từ vùng đất hoang.
+
+  Tiêu chí hoàn thành khởi tạo : Không phải "bao nhiêu mã đã được viết," mà là liệu bốn điều kiện của bootstrap contract có được đáp ứng không — có thể bắt đầu, có thể test, có thể thấy tiến độ, có thể chọn bước tiếp theo. Sử dụng danh sách kiểm tra này để xác nhận khởi tạo:
+
+  ## Danh sách Kiểm tra Chấp nhận Khởi tạo - [ ] `make setup` thành công từ đầu - [ ] `make test` có ít nhất một test vượt qua - [ ] Một phiên agent mới có thể trả lời "làm thế nào để chạy" và "làm thế nào để test" chỉ từ nội dung repo - [ ] Tệp phân chia tác vụ tồn tại với ít nhất 3 tác vụ - [ ] Mọi thứ đã được commit vào git Ví dụ Thực tế ​ Hai cách tiếp cận khởi tạo cho một dự án frontend React:
+
+  Cách tiếp cận hỗn hợp (đồng thời đổ móng và xây tường) : Agent đồng thời tạo scaffolding dự án và triển khai tính năng đầu tiên trong phiên 1. Ở cuối phiên, repo có mã có thể chạy nhưng: không có tài liệu lệnh bắt đầu/test rõ ràng, không có tệp theo dõi tiến độ, không có phân chia tác vụ. Phiên 2 dành ~20 phút để suy ra cấu trúc dự án, khung test và quy trình build — giống như đội xây dựng mới đến công trường, không biết móng đã chạy đến đâu hoặc đường ống nước ở đâu, phải đào lỗ từng chỗ để tìm ra.
+
+  Khởi tạo riêng biệt (móng trước) : Phiên 1 chỉ làm khởi tạo — tạo cấu trúc thư mục từ mẫu, cấu hình khung test (Vitest + React Testing Library), viết và xác minh một test mẫu, tạo tài liệu bootstrap contract và tệp phân chia tác vụ, commit checkpoint ban đầu. Chi phí tái xây dựng của phiên 2 dưới 3 phút, và nó bắt đầu làm việc trực tiếp từ danh sách tác vụ — đội đến, nhìn vào bản vẽ, và biết chính xác nơi cần tiếp tục.
+
+  So sánh chu kỳ dự án đầy đủ: tổng thời gian tái xây dựng (qua tất cả các phiên) của cách tiếp cận hỗn hợp cao hơn ~60% so với cách tiếp cận khởi tạo riêng biệt. 20 phút thêm dành cho khởi tạo được thu hồi nhiều lần trong các phiên tiếp theo. Giống như móng vững giúp tường xây nhanh hơn — chậm là nhanh.
+
+
+  ## Những Điểm chính cần Nhớ ​
+
+
+  - Khởi tạo và triển khai có mục tiêu tối ưu hóa khác nhau — trộn lẫn chúng chỉ kéo cả hai xuống. Đổ móng trước, rồi xây tường.
+  - Kết quả của khởi tạo không phải là mã, mà là cơ sở hạ tầng: môi trường có thể chạy, test có thể xác minh, bootstrap contract, phân chia tác vụ.
+  - Xác nhận khởi tạo bằng bốn điều kiện của bootstrap contract: có thể bắt đầu, có thể test, có thể thấy tiến độ, có thể chọn bước tiếp theo.
+  - Khởi động ấm tốt hơn khởi động lạnh. Sử dụng mẫu dự án để đặt trước cơ sở hạ tầng chuẩn hóa.
+  - Thời gian đầu tư vào khởi tạo được thu hồi hoàn toàn trong 3-4 phiên tiếp theo. Đây không phải chi phí thêm — đó là đầu tư trước. Móng càng vững, tòa nhà xây càng nhanh.
+
+
+  ## Đọc thêm ​
+
+
+  - Anthropic: Effective Harnesses for Long-Running Agents
+  - OpenAI: Harness Engineering
+  - HumanLayer: Harness Engineering for Coding Agents
+  - Infrastructure as Code — Martin Fowler
+  - SWE-agent: Agent-Computer Interfaces
+  - Thiết kế bootstrap contract : Viết một bootstrap contract hoàn chỉnh cho một dự án bạn đang phát triển. Sau đó mở một phiên agent hoàn toàn mới, chỉ hiển thị nội dung repo (không có ngữ cảnh lời nói), và để nó thử bắt đầu dự án, chạy test và hiểu tiến độ hiện tại. Ghi lại mọi vấn đề gặp phải — mỗi vấn đề tương ứng với một điều khoản còn thiếu trong bootstrap contract của bạn.
+  - Thí nghiệm so sánh : Chọn một dự án mới cỡ vừa. Cách A: để agent đồng thời khởi tạo và thực hiện triển khai đầu tiên. Cách B: dành một phiên cho khởi tạo riêng biệt, bắt đầu triển khai trong phiên 2. Sau 4 phiên, so sánh: thời gian đến xác minh đầu tiên, chi phí tái xây dựng, tỷ lệ hoàn thành tính năng.
+  - Danh sách kiểm tra chấp nhận khởi tạo : Thiết kế một danh sách kiểm tra chấp nhận khởi tạo cho dự án của bạn. Để một phiên agent mới thực thi từng mục trong danh sách kiểm tra và ghi lại cái nào vượt qua và cái nào thất bại. Các mục thất bại là nơi harness của bạn cần được tăng cường.
 ---

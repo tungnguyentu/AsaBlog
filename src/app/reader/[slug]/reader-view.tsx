@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import type { Lecture } from "@/lib/content";
+import { useLang } from "@/context/lang-context";
 
 type Props = { lectures: Lecture[] };
 
@@ -11,6 +12,12 @@ export default function ReaderPage({ lectures }: Props) {
   const [progress, setProgress] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const bodyRef = useRef<HTMLElement>(null);
+  const { lang } = useLang();
+
+  // Pick the right language field — vi falls back to en if missing (guaranteed by getLectures)
+  function t(en: string, vi: string) {
+    return lang === "vi" ? vi : en;
+  }
 
   // IntersectionObserver to track which lecture heading is in view
   useEffect(() => {
@@ -80,7 +87,7 @@ export default function ReaderPage({ lectures }: Props) {
   }
 
   return (
-    <main className="page">
+    <main>
       {/* Terracotta reading progress bar */}
       <div className="read-progress" aria-hidden="true">
         <div
@@ -89,39 +96,27 @@ export default function ReaderPage({ lectures }: Props) {
         />
       </div>
 
-      <div className="container">
-        <nav className="crumbs">
-          <Link href="/">asa</Link>
-          <span className="sep">/</span>
-          <Link href="/post/harness-engineering/">harness engineering</Link>
-          <span className="sep">/</span>
-          <span style={{ color: "var(--ink)" }}>reader</span>
-        </nav>
+      <Link className="back" href="/post/harness-engineering/">← harness engineering</Link>
 
-        <div className="reader-shell">
-          {/* Sticky TOC */}
-          <aside className="reader-toc" aria-label="Lectures">
-            <div className="toc-label">contents</div>
-            {lectures.map((l) => (
-              <a
-                key={l.id}
-                href={"#" + l.id}
-                className={l.id === activeId ? "active" : ""}
-                onClick={(e) => {
-                  e.preventDefault();
-                  scrollToLecture(l.id);
-                }}
-              >
-                {l.title}
-              </a>
-            ))}
-            <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "var(--ink-mute)" }}>
-              …and 8 more
-            </a>
-          </aside>
+      {/* Compact TOC at top */}
+      <nav className="reader-toc" aria-label="Lectures">
+        <div className="toc-label">contents</div>
+        {lectures.map((l) => (
+          <a
+            key={l.id}
+            href={"#" + l.id}
+            className={l.id === activeId ? "active" : ""}
+            onClick={(e) => {
+              e.preventDefault();
+              scrollToLecture(l.id);
+            }}
+          >
+            {t(l.title_en, l.title_vi)}
+          </a>
+        ))}
+      </nav>
 
-          {/* Article body */}
-          <article className="reader-body" ref={bodyRef}>
+      <article className="reader-body" ref={bodyRef}>
             {lectures.map((l) => (
               <section key={l.id} data-lec={l.id} id={l.id}>
                 <div className="lec-meta">{l.num}</div>
@@ -144,19 +139,18 @@ export default function ReaderPage({ lectures }: Props) {
                   >
                     {copiedId === l.id ? "✓" : "§"}
                   </a>
-                  {l.title}
+                  {t(l.title_en, l.title_vi)}
                 </h2>
                 <p>
-                  <span className="lead">{l.lead}</span>
+                  <span className="lead">{t(l.lead_en, l.lead_vi)}</span>
                 </p>
                 <div className="rn-pair">
                   <div className="label">R · reader</div>
-                  <p>{l.r}</p>
+                  <p>{t(l.r_en, l.r_vi)}</p>
                   <div className="label" style={{ marginTop: 14 }}>
                     N · note
                   </div>
-                  <p>{l.note}</p>
-                  <p className="needed">— {l.notes}</p>
+                  <p>{t(l.note_en, l.note_vi)}</p>
                 </div>
               </section>
             ))}
@@ -166,8 +160,6 @@ export default function ReaderPage({ lectures }: Props) {
               <Link href="/deck/harness-engineering/">open slide deck →</Link>
             </div>
           </article>
-        </div>
-      </div>
     </main>
   );
 }

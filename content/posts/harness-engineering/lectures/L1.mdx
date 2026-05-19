@@ -1,9 +1,267 @@
 ---
 id: "L1"
 num: "Lecture 01"
-title: "Mô hình mạnh không đồng nghĩa chạy việc đáng tin cậy"
-lead: "Trong môi trường dev thật: yêu cầu mơ hồ + luật ngầm + env bẫy + thiếu verify => agent phải \"đoán\"."
-r: "Vấn đề: Agent làm được việc nhưng hay phá test / lệch yêu cầu / báo \"xong\" khi chưa chạy end-to-end. / Vấn đề thường không nằm ở model mà ở \"harness\" (hệ thống bao quanh model).\nÝ chính: Trong môi trường dev thật: yêu cầu mơ hồ + luật ngầm + env bẫy + thiếu verify => agent phải \"đoán\". / Harness biến năng lực model thành độ tin cậy (giống \"yên ngựa\" cho ngựa tốt)."
-note: "Chuẩn hoá cách mô tả task (định nghĩa \"done\")."
-notes: "Nên làm: Chuẩn hoá cách mô tả task (định nghĩa \"done\"). / Ghi luật ngầm vào repo. / Chuẩn bị môi trường + lệnh verify rõ ràng. | Sơ đồ: Problem -> Guessing -> Breaks -> \"Done\" (ảo) Fix: Intent rõ + Rule rõ + Env sạch + Verify chạy được"
+title_en: |
+  Strong Models Don't Mean Reliable Execution
+title_vi: |
+  Mô hình Mạnh Không có nghĩa là Thực thi Đáng tin cậy
+lead_en: |
+  You consider yourself well-traveled in the AI world — Claude Pro subscription, GPT-4o API key, SWE-bench leaderboard numbers memorized.
+lead_vi: |
+  Bạn tự coi mình là người có kinh nghiệm trong thế giới AI — đăng ký Claude Pro, có API key GPT-4o, thuộc lòng các con số trên bảng xếp hạng SWE-bench.
+r_en: |
+  One day you finally hand a real project to an AI agent, brimming with confidence. The result? It adds a feature but breaks the tests, fixes a bug but introduces two more, runs for 20 minutes and proudly declares "done" — and you look at the code and it's not what you asked for at all. Your first instinct? "This model isn't good enough. Time to upgrade." Hold on.
+r_vi: |
+  Một ngày nào đó bạn cuối cùng giao một dự án thực sự cho một AI agent, đầy tự tin. Kết quả? Nó thêm một tính năng nhưng làm hỏng các bài test, sửa một lỗi nhưng gây ra thêm hai lỗi khác, chạy 20 phút và tự hào tuyên bố "xong" — nhưng khi bạn nhìn vào mã nguồn, nó hoàn toàn không phải là thứ bạn yêu cầu. Phản ứng đầu tiên của bạn? "Mô hình này không đủ tốt. Thời điểm nâng cấp." Khoan đã.
+note_en: |
+  Move to your daily development environment — vague requirements, no existing tests, implicit business rules scattered everywhere — and that number only goes down.
+note_vi: |
+  Chuyển sang môi trường phát triển hàng ngày của bạn — yêu cầu mơ hồ, không có test, các quy tắc kinh doanh ẩn rải rác khắp nơi — và con số đó chỉ giảm xuống.
+full_en: |
+  > Code examples: code/ Practice project: Project 01. Prompt-only vs. rules-first
+
+
+  ## Lecture 01. Strong Models Don't Mean Reliable Execution ​
+
+
+  You consider yourself well-traveled in the AI world — Claude Pro subscription, GPT-4o API key, SWE-bench leaderboard numbers memorized. One day you finally hand a real project to an AI agent, brimming with confidence. The result? It adds a feature but breaks the tests, fixes a bug but introduces two more, runs for 20 minutes and proudly declares "done" — and you look at the code and it's not what you asked for at all.
+
+  Your first instinct? "This model isn't good enough. Time to upgrade." Hold on. Before you reach for your wallet, consider that the problem might not be the model at all.
+
+  Let's look at some numbers. As of late 2025, the strongest coding agents on SWE-bench Verified achieve roughly 50-60%. And that's on carefully selected tasks with clear issue descriptions and existing test cases. Move to your daily development environment — vague requirements, no existing tests, implicit business rules scattered everywhere — and that number only goes down.
+
+  But behind these numbers lies a counterintuitive truth.
+
+
+  ## Same Horse, Different Fates ​
+
+
+  Anthropic ran a controlled experiment. Same prompt ("build a 2D retro game maker"), same model (Opus 4.5). First run: bare, no support — 20 minutes, $9, the game's core features didn't work at all. Second run: full harness (planner + generator + evaluator three-agent architecture) — 6 hours, $200, the game was playable.
+
+  They didn't change the model. Opus 4.5 was still Opus 4.5. What changed was the saddle.
+
+  OpenAI's 2025 harness engineering article puts it plainly: Codex in a well-harnessed repository goes from "unreliable" to "reliable." Note their wording — not "a bit better," but a qualitative shift. Like a thoroughbred: you can ride it without a saddle, but you won't go far, won't go fast, and falling off is no surprise. The harness is that saddle — everything in the engineering infrastructure outside the model weights.
+
+
+  ## Where Agents Actually Get Stuck ​
+
+
+  So what specifically goes wrong?
+
+  The most common: you never clearly defined the task. You say "add a search feature," and the agent's understanding is completely different from yours — search what? Full-text or structured? Pagination? Highlighting? You didn't specify, so the agent guesses. A correct guess is luck; a wrong one costs more to fix than being specific would have cost in the first place. It's like walking into a restaurant and telling the chef "I'll have fish" — whether you get it braised, steamed, or in a hot pot is entirely up to chance.
+
+  Even when you do specify, the project has implicit architectural conventions the agent doesn't know. Your team standardized on SQLAlchemy 2.0 syntax, but the agent writes 1.x code by default. All API endpoints must use OAuth 2.0 authentication, but that rule only exists in your head and a Slack message from three months ago. The agent can't see these — it's not that it doesn't want to comply, it literally doesn't know these rules exist.
+
+  The environment is a trap too. Incomplete dev environment, missing dependencies, wrong tool versions. The agent burns precious context window on pip install failures and Node version mismatches instead of solving your actual task. Like hiring a skilled carpenter but forgetting to provide a hammer, nails, or a level workbench — no matter how talented, they can't do the job.
+
+  Even more common: there's simply no way to verify. No tests, no lint, or verification commands never communicated to the agent. The agent writes code, looks at it, decides it's fine, says "done." It's like asking a student to submit homework with no answer key — they think they got it right, but when you grade it there's a pile of errors. Anthropic also observed an interesting phenomenon: when agents sense context is running low, they rush to finish, skip verification, and choose a simple solution over the optimal one. They call it "context anxiety" — the same thing that happens when you realize time is almost up on an exam and start randomly guessing on the remaining multiple-choice questions.
+
+  Long tasks spanning sessions are even worse — all discoveries from the previous session are lost, and every new session has to re-explore the project structure and re-understand the code organization. Agents without persistent state see failure rates spike sharply on tasks exceeding 30 minutes.
+
+
+  ## Key Terminology ​
+
+
+  With these scenarios in mind, these concepts are no longer just jargon:
+
+  - Capability Gap : The huge gulf between model performance on benchmarks and performance on real tasks. A 50-60% pass rate on SWE-bench Verified means nearly half of real issues can't be resolved.
+  - Harness : Everything outside the model — instructions, tools, environment, state management, verification feedback. If it's not model weights, it's harness. What we've been calling the "saddle."
+  - Harness-Induced Failure : The model has enough capability, but the execution environment has structural defects. Anthropic's controlled experiment already proved this.
+  - Verification Gap : The gap between the agent's confidence in its output and actual correctness. The agent says "I'm done" when it's not done — this is the most common failure mode.
+  - Diagnostic Loop : Execute, observe failure, attribute to a specific harness layer, fix that layer, re-execute. This is the core methodology of harness engineering.
+  - Definition of Done : A set of machine-verifiable conditions — tests pass, lint is clean, type checks pass. Without an explicit definition of done, the agent will invent its own.
+
+
+  ## When Things Fail, Fix the Harness First ​
+
+
+  Core principle: When things fail, don't swap the model first — check the harness. If the same model succeeds on similar, well-structured tasks, assume it's a harness problem. It's like a car breaking down — you don't immediately suspect the engine. You check if it's out of gas first.
+
+  Concrete steps:
+
+  Attribute every failure to a specific layer. Don't just say "the model sucks." Ask: was the task unclear? Was context insufficient? Were there no verification methods? Map each failure to one of the five failure layers (task specification, context provision, execution environment, verification feedback, state management). Build this habit, and you'll find "the model isn't good enough" appearing less and less in your logs.
+
+  Write an explicit Definition of Done for every task. Don't say "add a search feature." Say:
+
+  Completion criteria: - New endpoint GET /api/search?q=xxx - Supports pagination, default 20 items - Results include highlighted snippets - All new code passes pytest - Type checking passes (mypy --strict) Create an AGENTS.md file. Put it in the repo root to tell the agent the project's tech stack, architectural conventions, and verification commands. This is the first step in harness engineering and the highest-ROI step you can take. One AGENTS.md file might be more effective than upgrading to a more expensive model — I'm not joking.
+
+  Build a diagnostic loop. Don't treat failures as "the model being dumb again." Treat them as signals that your harness has a defect. Each failure, identify the layer, fix it, never fail that way again. After a few rounds, your harness gets stronger and agent performance stabilizes. Like road repair — every pothole you fill makes the next stretch smoother.
+
+  Quantify improvements. Keep a simple log: did each task succeed or fail, and which layer caused the failure. After a few rounds you'll see which layer is the bottleneck — focus your energy there.
+
+
+  ## The Million-Line Experiment ​
+
+
+  OpenAI ran an aggressive experiment in 2025: use Codex to build a complete internal product from an empty git repository. Five months later, the repo had roughly one million lines of code — application logic, infrastructure, tooling, documentation, internal dev tools — all agent-generated. Three engineers drove Codex, opening and merging about 1,500 PRs. An average of 3.5 PRs per person per day.
+
+  The key constraint: humans never write code directly. This wasn't a gimmick — it was designed to force the team to figure out what changes when the engineer's primary job is no longer writing code, but designing environments, expressing intent, and building feedback loops.
+
+  Early progress was slower than expected. Not because Codex wasn't capable, but because the environment wasn't complete enough — the agent lacked necessary tools, abstractions, and internal structures to advance high-level objectives. The engineers' work became: breaking large goals into small building blocks (design, code, review, test), letting the agent assemble them, then using those blocks to unlock more complex tasks. When something failed, the fix was almost never "try harder" — it was "what capability is the agent missing, and how do we make it both understandable and executable?"
+
+  This experiment directly proves this lecture's core thesis: the same model produces fundamentally different output in a bare environment versus one with a complete harness. The model didn't change. The environment did.
+
+  > Source: OpenAI: Harness engineering: leveraging Codex in an agent-first world
+
+
+  ## A More Down-to-Earth Example ​
+
+
+  A team used Claude Sonnet to add a new API endpoint to a mid-sized Python web app (FastAPI + PostgreSQL + Redis, ~15,000 lines of code).
+
+  Initially they gave only one sentence: "add user preferences endpoints under /api/v2/users ." The result? The agent spent 40% of its context window exploring the repo structure, produced code that looked reasonable but didn't follow the project's error handling patterns, used old SQLAlchemy syntax, and declared completion while the endpoint had runtime errors. The next session had to redo all the discovery work.
+
+  Later they added AGENTS.md (describing project architecture and tech stack versions), explicit verification commands ( pytest tests/api/v2/ && python -m mypy src/ ), and architecture decision records. The same model succeeded in all three independent runs, with ~60% better context efficiency.
+
+  They didn't change the model. They changed the harness.
+
+
+  ## Key Takeaways ​
+
+
+  - Model capability and execution reliability are different things. A thoroughbred still needs a good saddle.
+  - When things fail, check the harness first, then the model. Swapping models is the most expensive option — and often it's not even a model problem.
+  - Every failure is a signal: your harness has a structural defect. Find it, fix it.
+  - Five defense layers: task specification, context provision, execution environment, verification feedback, state management. Check them systematically, like a doctor ruling out the most common causes first.
+  - One AGENTS.md file might be more effective than upgrading to a more expensive model. Seriously.
+
+
+  ## Further Reading ​
+
+
+  - OpenAI: Harness Engineering — Leveraging Codex in an Agent-First World
+  - Anthropic: Effective Harnesses for Long-Running Agents
+  - HumanLayer: Skill Issue — Harness Engineering for Coding Agents
+  - SWE-bench Leaderboard
+  - Thoughtworks Technology Radar: Harness Engineering
+
+
+  ## Exercises ​
+
+
+  - Comparison experiment : Pick a codebase you know well and a non-trivial modification task. First, run the agent with no harness support and record failures. Then add an AGENTS.md with explicit verification commands and run again with the same agent. Compare results, attributing each failure to one of the five defense layers.
+  - Verification gap measurement : Pick 5 coding tasks. After each task, record whether the agent claims completion, then verify actual correctness with independent tests. Calculate the proportion of times the agent claims done when it's actually not done — that's your verification gap. Then think: what verification commands would reduce this proportion?
+  - Diagnostic loop practice : Find a task where the agent repeatedly fails in your project. Run once, record the failure. Attribute it to one of the five layers. Fix that layer. Run again. Repeat three to five rounds, recording improvements each time.
+full_vi: |
+  English Version → | 中文版本 →
+
+  > Ví dụ mã nguồn: code/ Dự án thực hành: Dự án 01. Chỉ Prompt vs. Ưu tiên Quy tắc
+
+
+  ## Bài 01. Mô hình Mạnh Không có nghĩa là Thực thi Đáng tin cậy ​
+
+
+  Bạn tự coi mình là người có kinh nghiệm trong thế giới AI — đăng ký Claude Pro, có API key GPT-4o, thuộc lòng các con số trên bảng xếp hạng SWE-bench. Một ngày nào đó bạn cuối cùng giao một dự án thực sự cho một AI agent, đầy tự tin. Kết quả? Nó thêm một tính năng nhưng làm hỏng các bài test, sửa một lỗi nhưng gây ra thêm hai lỗi khác, chạy 20 phút và tự hào tuyên bố "xong" — nhưng khi bạn nhìn vào mã nguồn, nó hoàn toàn không phải là thứ bạn yêu cầu.
+
+  Phản ứng đầu tiên của bạn? "Mô hình này không đủ tốt. Thời điểm nâng cấp." Khoan đã. Trước khi bạn mở ví, hãy cân nhắc rằng vấn đề có thể hoàn toàn không phải là mô hình.
+
+  Hãy nhìn vào một vài con số. Tính đến cuối năm 2025, các coding agent mạnh nhất trên SWE-bench Verified đạt khoảng 50-60%. Và đó là trên các tác vụ được lựa chọn cẩn thận với mô tả vấn đề rõ ràng và các bài test hiện có. Chuyển sang môi trường phát triển hàng ngày của bạn — yêu cầu mơ hồ, không có test, các quy tắc kinh doanh ẩn rải rác khắp nơi — và con số đó chỉ giảm xuống.
+
+  Nhưng đằng sau những con số này ẩn chứa một sự thật phản trực giác.
+
+
+  ## Cùng Con Ngựa, Số Phận Khác Nhau ​
+
+
+  Anthropic đã thực hiện một thí nghiệm có kiểm soát. Cùng một prompt ("xây dựng một trình tạo trò chơi retro 2D"), cùng một mô hình (Opus 4.5). Lần chạy đầu tiên: trần trụi, không có hỗ trợ — 20 phút, $9, các tính năng cốt lõi của trò chơi hoàn toàn không hoạt động. Lần chạy thứ hai: harness đầy đủ (kiến trúc ba agent: planner + generator + evaluator) — 6 giờ, $200, trò chơi có thể chơi được.
+
+  Họ không thay đổi mô hình. Opus 4.5 vẫn là Opus 4.5. Những gì thay đổi là cái yên ngựa.
+
+  Bài viết về harness engineering năm 2025 của OpenAI nói thẳng: Codex trong một kho lưu trữ được trang bị harness tốt đi từ "không đáng tin cậy" đến "đáng tin cậy." Lưu ý cách diễn đạt của họ — không phải "tốt hơn một chút," mà là một sự thay đổi về chất. Giống như một con ngựa thuần chủng: bạn có thể cưỡi nó không có yên, nhưng bạn sẽ không đi xa, không nhanh, và việc ngã ngựa không có gì là ngạc nhiên. Harness là cái yên ngựa đó — tất cả mọi thứ trong cơ sở hạ tầng kỹ thuật bên ngoài trọng số mô hình.
+
+
+  ## Agent Thực sự Bị Kẹt Ở Đâu ​
+
+
+  Vậy cụ thể điều gì đi sai?
+
+  Phổ biến nhất: bạn không bao giờ xác định rõ ràng tác vụ. Bạn nói "thêm tính năng tìm kiếm," và sự hiểu biết của agent hoàn toàn khác với của bạn — tìm kiếm cái gì? Full-text hay có cấu trúc? Phân trang? Tô sáng? Bạn không chỉ định, vì vậy agent đoán. Đoán đúng là may mắn; đoán sai tốn nhiều chi phí để sửa hơn là cụ thể hóa ngay từ đầu. Giống như đi vào nhà hàng và bảo với đầu bếp "tôi muốn cá" — liệu bạn có cá kho, cá hấp hay cá lẩu là hoàn toàn phụ thuộc vào may rủi.
+
+  Ngay cả khi bạn đã chỉ định, dự án có các quy ước kiến trúc ẩn mà agent không biết. Nhóm của bạn đã chuẩn hóa cú pháp SQLAlchemy 2.0, nhưng agent mặc định viết mã 1.x. Tất cả các API endpoint phải sử dụng xác thực OAuth 2.0, nhưng quy tắc đó chỉ tồn tại trong đầu bạn và một tin nhắn Slack từ ba tháng trước. Agent không thể nhìn thấy những điều này — không phải vì nó không muốn tuân thủ, mà là vì nó thực sự không biết những quy tắc này tồn tại.
+
+  Môi trường cũng là một cái bẫy. Dev environment không đầy đủ, thiếu dependencies, phiên bản công cụ sai. Agent đốt cháy cửa sổ ngữ cảnh quý báu vào lỗi pip install và xung đột phiên bản Node thay vì giải quyết tác vụ thực tế của bạn. Giống như thuê một thợ mộc lành nghề nhưng quên cung cấp búa, đinh hoặc bàn làm việc bằng phẳng — dù tài năng đến đâu, họ cũng không thể làm được việc.
+
+  Thậm chí còn phổ biến hơn: đơn giản là không có cách nào để xác minh. Không có test, không có lint, hoặc các lệnh xác minh không bao giờ được truyền đạt cho agent. Agent viết mã, nhìn vào nó, quyết định nó ổn, nói "xong." Giống như yêu cầu học sinh nộp bài tập mà không có đáp án — họ nghĩ họ làm đúng, nhưng khi bạn chấm điểm có hàng đống lỗi. Anthropic cũng quan sát thấy một hiện tượng thú vị: khi các agent cảm thấy ngữ cảnh đang cạn kiệt, họ vội vàng hoàn thành, bỏ qua xác minh, và chọn một giải pháp đơn giản hơn giải pháp tối ưu. Họ gọi đây là "lo lắng ngữ cảnh" — điều tương tự xảy ra khi bạn nhận ra thời gian gần hết trong bài kiểm tra và bắt đầu đoán ngẫu nhiên các câu hỏi trắc nghiệm còn lại.
+
+  Các tác vụ dài trải dài qua nhiều phiên còn tệ hơn — tất cả những phát hiện từ phiên trước đều bị mất, và mọi phiên mới phải khám phá lại cấu trúc dự án và hiểu lại cách tổ chức mã. Các agent không có trạng thái liên tục thấy tỷ lệ thất bại tăng vọt trên các tác vụ vượt quá 30 phút.
+
+
+  ## Giải thích thuật ngữ chính ​
+
+
+  Với những tình huống này, các khái niệm sau không còn chỉ là thuật ngữ nữa:
+
+  - Khoảng cách Năng lực (Capability Gap) : Khoảng cách lớn giữa hiệu suất mô hình trên các điểm chuẩn và hiệu suất trên các tác vụ thực tế. Tỷ lệ vượt qua 50-60% trên SWE-bench Verified có nghĩa là gần một nửa số vấn đề thực tế không thể được giải quyết.
+  - Harness : Mọi thứ bên ngoài mô hình — hướng dẫn, công cụ, môi trường, quản lý trạng thái, phản hồi xác minh. Nếu không phải trọng số mô hình, thì đó là harness. Đó là cái chúng ta gọi là "yên ngựa."
+  - Lỗi Do Harness (Harness-Induced Failure) : Mô hình có đủ năng lực, nhưng môi trường thực thi có khiếm khuyết cấu trúc. Thí nghiệm có kiểm soát của Anthropic đã chứng minh điều này.
+  - Khoảng cách Xác minh (Verification Gap) : Khoảng cách giữa sự tự tin của agent vào kết quả của nó và tính đúng đắn thực tế. Agent nói "tôi đã xong" khi chưa xong — đây là chế độ lỗi phổ biến nhất.
+  - Vòng lặp Chẩn đoán (Diagnostic Loop) : Thực thi, quan sát lỗi, quy cho một lớp harness cụ thể, sửa lớp đó, thực thi lại. Đây là phương pháp luận cốt lõi của harness engineering.
+  - Định nghĩa Hoàn thành (Definition of Done) : Một tập hợp các điều kiện có thể xác minh bằng máy — test qua, lint sạch, type check qua. Không có định nghĩa hoàn thành rõ ràng, agent sẽ tự bịa ra định nghĩa của mình.
+
+
+  ## Khi Sự Cố Xảy ra, Sửa Harness Trước ​
+
+
+  Nguyên tắc cốt lõi: Khi sự cố xảy ra, đừng đổi mô hình trước — kiểm tra harness. Nếu cùng một mô hình thành công trên các tác vụ tương tự, có cấu trúc tốt, hãy giả định đó là vấn đề harness. Giống như xe hơi bị hỏng — bạn không ngay lập tức nghi ngờ động cơ. Bạn kiểm tra xăng trước.
+
+  Các bước cụ thể:
+
+  Quy mọi lỗi cho một lớp cụ thể. Đừng chỉ nói "mô hình không tốt." Hãy hỏi: tác vụ có mơ hồ không? Ngữ cảnh có không đủ không? Không có phương pháp xác minh không? Ánh xạ mỗi lỗi vào một trong năm lớp phòng thủ (đặc tả tác vụ, cung cấp ngữ cảnh, môi trường thực thi, phản hồi xác minh, quản lý trạng thái). Xây dựng thói quen này, và bạn sẽ thấy "mô hình không đủ tốt" xuất hiện ngày càng ít hơn trong nhật ký của bạn.
+
+  Viết Định nghĩa Hoàn thành rõ ràng cho mỗi tác vụ. Đừng nói "thêm tính năng tìm kiếm." Hãy nói:
+
+  Tiêu chí hoàn thành: - Endpoint GET /api/search?q=xxx mới - Hỗ trợ phân trang, mặc định 20 mục - Kết quả bao gồm đoạn trích được tô sáng - Tất cả mã mới vượt qua pytest - Type checking vượt qua (mypy --strict) Tạo tệp AGENTS.md. Đặt nó trong thư mục gốc của repo để cho agent biết tech stack của dự án, các quy ước kiến trúc, và các lệnh xác minh. Đây là bước đầu tiên trong harness engineering và bước có ROI cao nhất bạn có thể thực hiện. Một tệp AGENTS.md có thể hiệu quả hơn việc nâng cấp lên mô hình đắt tiền hơn — tôi không nói đùa.
+
+  Xây dựng vòng lặp chẩn đoán. Đừng coi lỗi là "mô hình lại ngốc rồi." Coi chúng là tín hiệu rằng harness của bạn có khiếm khuyết. Mỗi lỗi, xác định lớp, sửa nó, không bao giờ thất bại theo cách đó nữa. Sau vài vòng, harness của bạn mạnh hơn và hiệu suất agent ổn định hơn. Giống như vá đường — mỗi ổ gà bạn lấp đầy làm cho đoạn đường tiếp theo êm hơn.
+
+  Định lượng cải tiến. Giữ một nhật ký đơn giản: mỗi tác vụ có thành công hay thất bại, và lớp nào gây ra lỗi. Sau vài vòng, bạn sẽ thấy lớp nào là điểm nghẽn cổ chai — tập trung năng lượng của bạn ở đó.
+
+
+  ## Thí nghiệm Triệu Dòng Mã ​
+
+
+  OpenAI đã thực hiện một thí nghiệm táo bạo vào năm 2025: sử dụng Codex để xây dựng một sản phẩm nội bộ hoàn chỉnh từ một kho git trống. Năm tháng sau, kho có khoảng một triệu dòng mã — logic ứng dụng, cơ sở hạ tầng, công cụ, tài liệu, công cụ dev nội bộ — tất cả được tạo bởi agent. Ba kỹ sư điều khiển Codex, mở và hợp nhất khoảng 1,500 PR. Trung bình 3.5 PR mỗi người mỗi ngày.
+
+  Ràng buộc chính: con người không bao giờ viết mã trực tiếp. Đây không phải là trò gimmick — nó được thiết kế để buộc nhóm phải tìm ra điều gì thay đổi khi công việc chính của kỹ sư không còn là viết mã, mà là thiết kế môi trường, diễn đạt ý định, và xây dựng các vòng phản hồi.
+
+  Tiến độ ban đầu chậm hơn dự kiến. Không phải vì Codex không đủ năng lực, mà vì môi trường chưa đủ hoàn chỉnh — agent thiếu các công cụ, trừu tượng và cấu trúc nội bộ cần thiết để tiến lên các mục tiêu cấp cao. Công việc của các kỹ sư trở thành: chia nhỏ các mục tiêu lớn thành các khối xây dựng nhỏ (thiết kế, mã hóa, đánh giá, kiểm tra), để agent lắp ráp chúng, rồi sử dụng những khối đó để mở khóa các tác vụ phức tạp hơn. Khi có sự cố, câu trả lời gần như không bao giờ là "cố gắng hơn" — mà là "agent đang thiếu năng lực gì, và làm thế nào để chúng ta làm cho nó có thể hiểu và thực thi được?"
+
+  Thí nghiệm này trực tiếp chứng minh luận điểm cốt lõi của bài giảng này: cùng một mô hình tạo ra kết quả về cơ bản khác nhau trong môi trường trần trụi so với môi trường có harness đầy đủ. Mô hình không thay đổi. Môi trường thay đổi.
+
+  > Nguồn: OpenAI: Harness engineering: leveraging Codex in an agent-first world
+
+
+  ## Một Ví dụ Thực tế Hơn ​
+
+
+  Một nhóm sử dụng Claude Sonnet để thêm một API endpoint mới vào ứng dụng web Python cỡ trung (FastAPI + PostgreSQL + Redis, ~15,000 dòng mã).
+
+  Ban đầu họ chỉ đưa ra một câu: "thêm các endpoint tùy chọn người dùng dưới /api/v2/users ." Kết quả? Agent dành 40% cửa sổ ngữ cảnh để khám phá cấu trúc repo, tạo ra mã trông có vẻ hợp lý nhưng không theo các mẫu xử lý lỗi của dự án, sử dụng cú pháp SQLAlchemy cũ, và tuyên bố hoàn thành trong khi endpoint có lỗi runtime. Phiên tiếp theo phải làm lại toàn bộ công việc khám phá.
+
+  Sau đó họ thêm AGENTS.md (mô tả kiến trúc dự án và phiên bản tech stack), các lệnh xác minh rõ ràng ( pytest tests/api/v2/ && python -m mypy src/ ), và các bản ghi quyết định kiến trúc. Cùng một mô hình đã thành công trong cả ba lần chạy độc lập, với hiệu quả ngữ cảnh tốt hơn khoảng 60%.
+
+  Họ không thay đổi mô hình. Họ thay đổi harness.
+
+
+  ## Những Điểm chính cần Nhớ ​
+
+
+  - Năng lực mô hình và độ tin cậy thực thi là hai điều khác nhau. Một con ngựa thuần chủng vẫn cần một cái yên tốt.
+  - Khi sự cố xảy ra, kiểm tra harness trước, rồi mới đến mô hình. Đổi mô hình là lựa chọn tốn kém nhất — và thường thậm chí không phải là vấn đề mô hình.
+  - Mỗi lỗi là một tín hiệu: harness của bạn có khiếm khuyết cấu trúc. Tìm nó, sửa nó.
+  - Năm lớp phòng thủ: đặc tả tác vụ, cung cấp ngữ cảnh, môi trường thực thi, phản hồi xác minh, quản lý trạng thái. Kiểm tra chúng có hệ thống, như bác sĩ loại trừ các nguyên nhân phổ biến nhất trước.
+  - Một tệp AGENTS.md có thể hiệu quả hơn việc nâng cấp lên mô hình đắt tiền hơn. Thực sự vậy.
+
+
+  ## Đọc thêm ​
+
+
+  - OpenAI: Harness Engineering — Leveraging Codex in an Agent-First World
+  - Anthropic: Effective Harnesses for Long-Running Agents
+  - HumanLayer: Skill Issue — Harness Engineering for Coding Agents
+  - SWE-bench Leaderboard
+  - Thoughtworks Technology Radar: Harness Engineering
+  - Thí nghiệm so sánh : Chọn một codebase bạn biết rõ và một tác vụ sửa đổi không tầm thường. Đầu tiên, chạy agent mà không có hỗ trợ harness và ghi lại các lỗi. Sau đó thêm AGENTS.md với các lệnh xác minh rõ ràng và chạy lại với cùng agent. So sánh kết quả, quy mỗi lỗi vào một trong năm lớp phòng thủ.
+  - Đo lường khoảng cách xác minh : Chọn 5 tác vụ lập trình. Sau mỗi tác vụ, ghi lại xem agent có tuyên bố hoàn thành không, sau đó xác minh tính đúng đắn thực tế bằng các bài test độc lập. Tính tỷ lệ lần agent tuyên bố xong khi thực tế chưa xong — đó là khoảng cách xác minh của bạn. Sau đó suy nghĩ: những lệnh xác minh nào sẽ giảm tỷ lệ này?
+  - Thực hành vòng lặp chẩn đoán : Tìm một tác vụ mà agent liên tục thất bại trong dự án của bạn. Chạy một lần, ghi lại lỗi. Quy nó cho một trong năm lớp. Sửa lớp đó. Chạy lại. Lặp lại ba đến năm vòng, ghi lại cải tiến mỗi lần.
 ---

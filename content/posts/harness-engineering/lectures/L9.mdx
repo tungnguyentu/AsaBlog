@@ -1,9 +1,279 @@
 ---
 id: "L9"
 num: "Lecture 09"
-title: "Chặn agent tuyên bố xong quá sớm"
-lead: "Cần termination criteria: done = thỏa điều kiện chạy được (không phải cảm giác)."
-r: "Vấn đề: Agent \"tự tin\" báo xong nhưng runtime fail.\nÝ chính: Cần termination criteria: done = thỏa điều kiện chạy được (không phải cảm giác). / Ưu tiên verify chức năng trước rồi mới tối ưu/style."
-note: "3 lớp kiểm: unit/lint -> integration -> end-to-end."
-notes: "Nên làm: 3 lớp kiểm: unit/lint -> integration -> end-to-end. / Bắt buộc đính kèm bằng chứng lệnh chạy pass. | Sơ đồ: Looks ok != Runs ok Done = evidence"
+title_en: |
+  Preventing Agents from Declaring Victory Too Early
+title_vi: |
+  Ngăn chặn Agent Tuyên bố Thành công Quá sớm
+lead_en: |
+  You ask an agent to implement a "password reset" feature.
+lead_vi: |
+  Bạn yêu cầu một agent thực hiện tính năng "đặt lại mật khẩu".
+r_en: |
+  It modifies the database schema, writes the API endpoint, adds the email template, runs unit tests (all pass), and then confidently tells you "it's done." When you actually try to run it—the password reset link can't be sent (missing email service config), the database migration fails halfway through (schema inconsistency), and the end-to-end flow hasn't been executed even once.
+r_vi: |
+  Nó sửa đổi cấu trúc cơ sở dữ liệu, viết API endpoint, thêm mẫu email, chạy unit test (tất cả đều qua), và sau đó tự tin nói với bạn rằng "đã xong." Nhưng khi bạn thực sự thử chạy nó—liên kết đặt lại mật khẩu không thể gửi được (thiếu cấu hình dịch vụ email), quá trình di chuyển cơ sở dữ liệu bị lỗi giữa chừng (không nhất quán cấu trúc), và toàn bộ quy trình chưa được thực thi thực tế dù chỉ một lần.
+note_en: |
+  Your harness must replace the agent's "feelings" with externalized, execution-based verification.
+note_vi: |
+  Harness của bạn phải thay thế "cảm giác" của agent bằng sự xác minh dựa trên thực thi bên ngoài.
+full_en: |
+  > Code examples for this lecture: code/ Hands-on practice: Project 05. Let the agent verify its own work
+
+
+  ## Lecture 9. Preventing Agents from Declaring Victory Too Early ​
+
+
+  You ask an agent to implement a "password reset" feature. It modifies the database schema, writes the API endpoint, adds the email template, runs unit tests (all pass), and then confidently tells you "it's done." When you actually try to run it—the password reset link can't be sent (missing email service config), the database migration fails halfway through (schema inconsistency), and the end-to-end flow hasn't been executed even once.
+
+  This feeling shouldn't be unfamiliar—it's like filling up the entire exam paper, confidently being the first to hand it in, only to fail when the grades come out. Just because the paper is full doesn't mean the answers are right.
+
+  This isn't an isolated incident. The classic 2017 ICML paper by Guo et al. proved: modern neural networks are systematically overconfident —the confidence reported by models is significantly higher than their actual accuracy. The same applies to AI coding agents: they "feel" they're done, but in reality, they're far from it. Your harness must replace the agent's "feelings" with externalized, execution-based verification.
+
+
+  ## The Slippery Slope ​
+
+
+  Premature completion declarations almost always follow the same pattern: the code looks okay—syntax is correct, logic seems reasonable, and static analysis shows no obvious errors. But the harness doesn't enforce comprehensive execution verification, so the agent skips actually running it or only runs partial tests. It runs unit tests but skips integration tests; it runs tests but doesn't check coverage. Ultimately, "the code looks fine" is taken as evidence that "the feature is complete." And the exam paper is handed in.
+
+  Information is lost at every step. From task specifications to code implementation to runtime behavior, every transformation can introduce bias, and every skipped verification exacerbates the information asymmetry.
+
+
+  ## Three-Layer Termination Check ​
+
+
+
+  ## Core Concepts ​
+
+
+  - Premature Completion Declaration : The agent asserts the task is complete, but unmet correctness specifications still exist. The core issue: the agent judges based on local confidence at the code level, while system-level correctness requires global verification.
+  - Confidence Calibration Bias : The systematic gap between the agent's self-reported confidence in completion and the actual completion quality. For complex multi-file tasks, this bias is significantly positive—the agent is always more confident than it actually performs. Just like a student who always overestimates their score after an exam.
+  - Termination Criteria : A clear, executable set of judgment conditions defined in the harness. The agent must satisfy all conditions before declaring completion. "Done" shifts from a subjective judgment to an objective determination.
+  - Verification-Validation Dual Gate : The first verification layer checks "did the code correctly implement the specified behavior"; the second validation layer checks "does the system-level behavior meet the end-to-end requirements". Both must pass to be considered complete.
+  - Runtime Feedback Signals : Logs, process states, and health checks from program execution. This is the objective basis for the harness to judge completion quality.
+  - Completion Priority Constraint : First verify functional correctness, then handle performance, and finally address style. Refactoring is forbidden until core functionality is verified.
+
+
+  ## Passing Unit Tests ≠ Task Complete ​
+
+
+  This is the most common trap, and the most dangerous one. The agent wrote the code, ran the unit tests, got all greens, and said "done." But the design philosophy of unit tests—isolating the tested unit and mocking dependencies—is exactly what makes them incapable of detecting cross-component issues:
+
+  Interface Mismatch : The file path passed by the render process to the preload script is a relative path, but the preload script expects an absolute path. Their respective unit tests both used mocks and passed. The issue is only discovered during end-to-end testing. Just like every musician in a band practicing perfectly on their own, only to realize they are in different keys when playing together.
+
+  State Propagation Errors : A database migration changes the table schema, but the ORM caching layer still holds cache entries for the old schema. Unit tests provide a fresh mock environment every time, which won't expose this cross-layer state inconsistency.
+
+  Environment Dependency : The code behaves correctly in the test environment (where everything is mocked) but fails in the real environment due to configuration differences, network latency, or service unavailability. Like singing perfectly in the rehearsal room, but encountering audio equipment issues on stage.
+
+
+  ## "Refactoring While We're at It" is Poison to Completion Judgment ​
+
+
+  Claude Code has a common behavioral pattern: it starts refactoring code, optimizing performance, and improving style before the core functionality has passed verification. Knuth's quote, "Premature optimization is the root of all evil," takes on new meaning in the agent scenario—refactoring alters the boundary between verified and unverified code, potentially breaking previously implicitly correct code paths. It's like re-copying your multiple-choice answers for better formatting before you've finished the math essay questions—not only does it waste time, but you might copy them wrong.
+
+
+  ## Systematic Bias in Self-Evaluation ​
+
+
+  Anthropic discovered a deeper failure pattern in their 2026 research: when an agent is asked to evaluate its own work, it systematically provides overly positive evaluations—even when a human observer would consider the quality clearly substandard. This is like asking a student to grade their own exam—they will always be particularly lenient with their own answers.
+
+  This issue is especially severe in subjective tasks (such as design aesthetics)—whether a "layout is exquisite" is a judgment call, and the agent reliably skews positive. Even on tasks with verifiable results, the agent's performance can be hindered by poor judgment.
+
+  The solution isn't to make the agent "more objective"—the same model generating and evaluating inherently favors being generous to itself. The solution is to separate the "worker" from the "checker". Just like a student shouldn't grade their own exam—you need an independent grader.
+
+  An independent evaluating agent, specifically tuned to be "picky", is far more effective than having the generating agent evaluate itself. Experimental data from Anthropic:
+
+  This is the exact same model (Opus 4.5) with the exact same prompt ("build a 2D retro game editor"). The only difference is the harness—from "running bare" to "planner expands requirements → generator implements feature by feature → evaluator performs actual click testing using Playwright".
+
+  > Source: Anthropic: Harness design for long-running application development
+
+
+  ## How to Prevent Premature Hand-ins ​
+
+
+
+  ## 1. Externalize Termination Judgment ​
+
+
+  The completion judgment shouldn't be made by the agent itself. The harness must independently execute termination validation, using runtime signals as input, not the agent's confidence. Write this clearly in CLAUDE.md :
+
+  ## Definition of Done - Feature complete = end-to-end verification passed, not "code is written" - Required verification levels: 1. Unit tests pass 2. Integration tests pass 3. End-to-end flow verification passes - Do not proceed to level 2 if level 1 fails - Do not proceed to level 3 if level 2 fails 2. Build a Three-Layer Termination Validation ​ Layer 1: Syntax and Static Analysis . Lowest cost, least information, but must pass. This is the bare minimum check—you must spell the words right before we look at anything else. Layer 2: Runtime Behavior Verification . Test execution, app startup checks, critical path validation. This is the core evidence of completion. It's not enough to just write it; it must run. Layer 3: System-Level Confirmation . End-to-end testing, integration validation, user scenario simulation. The final line of defense against premature declarations. It's not enough to run; it must run correctly. 3. Design Good "Red Pen Markups" for Agents ​ OpenAI introduced a particularly effective pattern during their Codex practice: error messages for agents should include fix instructions . Don't just draw a big red cross like a lazy grader; be like a good teacher and write "here's how you should change this" in the margins. Don't use "Test failed" , but use "Test failed: POST /api/reset-password returned 500. Check that the email service config exists in environment variables. The template file should be at templates/reset-email.html." This specific, actionable feedback allows the agent to self-correct without human intervention.
+
+
+  ## 4. Capture Runtime Signals ​
+
+
+  Effective runtime signals include:
+
+  - Did the application successfully start and reach a ready state?
+  - Did the critical feature paths execute successfully at runtime?
+  - Were database writes, file operations, and other side effects correct?
+  - Were temporary resources cleaned up?
+
+
+  ## Real-World Case ​
+
+
+  Task : Implement user password reset functionality. Involves database operations, email sending, and API endpoint modifications.
+
+  Premature hand-in path : Agent modifies database schema, writes API endpoint, adds email template, runs unit tests (passes), and declares completion. The exam paper is completely filled out.
+
+  Actual point deductions : (1) End-to-end flow untested—the actual sending and verification of the reset link was never confirmed. (2) Database migration failed after partial execution, causing schema inconsistency. (3) Email service config was missing in the target environment.
+
+  Harness intervention : Termination validation enforced—(1) Start the full app to verify reset endpoint accessibility; (2) Execute the full reset flow; (3) Verify database state consistency. All defects were found within the session, saving 5-10x the cost of subsequent fixes. The independent grader found the real issues.
+
+
+  ## Key Takeaways ​
+
+
+  - Agents are systematically overconfident —confidence calibration bias is an objective reality. Filling out the exam paper doesn't mean you got it right.
+  - Completion judgment must be externalized —the harness verifies independently; don't trust the agent's "feelings". Students cannot grade their own exams.
+  - All three layers of validation are essential —syntax passing, behavior passing, system passing, progressing layer by layer.
+  - Error messages should be like a good teacher's red pen markup —include specific fix steps so the agent can self-correct.
+  - No refactoring until core functionality is verified —the completion priority constraint is the key to preventing premature optimization.
+
+
+  ## Further Reading ​
+
+
+  - On Calibration of Modern Neural Networks - Guo et al. — Proves modern deep networks are systematically overconfident
+  - Building Effective Agents - Anthropic — The critical role of runtime evidence in completion judgment
+  - Harness Engineering - OpenAI — Premature completion declaration is one of the main failure modes of agents
+  - The Art of Software Testing - Myers — Classic reference on testing method hierarchies and effectiveness
+
+
+  ## Exercises ​
+
+
+  - Termination Validation Function Design : Design a complete termination validation for a task involving a database migration and API modification. List the required runtime signals and the pass/fail criteria for each signal. Run it on a real task and record what hidden issues it finds.
+  - Calibration Bias Measurement : Choose 10 different types of coding tasks, and record the agent's self-reported completion confidence vs. the actual completion quality. Calculate the bias value and analyze its relationship with task complexity.
+  - Multi-Layer Defense Experiment : Run three configurations on the same set of tasks—(a) static analysis only, (b) add unit testing, (c) full three-layer validation. Compare the proportion of premature completion declarations and the number of uncaught defects.
+full_vi: |
+  English Version → | 中文版本 →
+
+  > Mã nguồn ví dụ cho bài giảng này: code/ Thực hành: Dự án 05. Để agent tự xác minh công việc của mình
+
+
+  ## Bài 9. Ngăn chặn Agent Tuyên bố Thành công Quá sớm ​
+
+
+  Bạn yêu cầu một agent thực hiện tính năng "đặt lại mật khẩu". Nó sửa đổi cấu trúc cơ sở dữ liệu, viết API endpoint, thêm mẫu email, chạy unit test (tất cả đều qua), và sau đó tự tin nói với bạn rằng "đã xong." Nhưng khi bạn thực sự thử chạy nó—liên kết đặt lại mật khẩu không thể gửi được (thiếu cấu hình dịch vụ email), quá trình di chuyển cơ sở dữ liệu bị lỗi giữa chừng (không nhất quán cấu trúc), và toàn bộ quy trình chưa được thực thi thực tế dù chỉ một lần.
+
+  Cảm giác này không có gì lạ—giống như việc điền kín toàn bộ bài thi, tự tin nộp bài đầu tiên, chỉ để trượt khi có điểm. Chỉ vì bài thi được viết kín không có nghĩa là các câu trả lời đều đúng.
+
+  Đây không phải là một sự cố cá biệt. Bài báo ICML kinh điển năm 2017 của Guo và cộng sự đã chứng minh: các mạng nơ-ron hiện đại thường quá tự tin một cách có hệ thống —độ tự tin mà các mô hình báo cáo cao hơn đáng kể so với độ chính xác thực tế của chúng. Điều này cũng đúng với các AI coding agent: chúng "cảm thấy" chúng đã xong, nhưng thực tế, chúng còn lâu mới xong. Harness của bạn phải thay thế "cảm giác" của agent bằng sự xác minh dựa trên thực thi bên ngoài.
+
+
+  ## Con dốc trơn trượt ​
+
+
+  Các tuyên bố hoàn thành sớm hầu như luôn theo cùng một khuôn mẫu: mã trông có vẻ ổn—cú pháp đúng, logic có vẻ hợp lý và phân tích tĩnh không cho thấy lỗi rõ ràng. Nhưng harness không bắt buộc xác minh thực thi toàn diện, do đó agent bỏ qua việc thực sự chạy mã hoặc chỉ chạy các bài kiểm thử một phần. Nó chạy unit test nhưng bỏ qua integration test; nó chạy test nhưng không kiểm tra độ phủ (coverage). Cuối cùng, "mã trông có vẻ ổn" được coi là bằng chứng cho "tính năng đã hoàn thành." Và bài thi được nộp.
+
+  Thông tin bị mất đi ở mỗi bước. Từ thông số kỹ thuật tác vụ đến triển khai mã rồi đến hành vi runtime, mọi sự chuyển đổi đều có thể đưa vào sự sai lệch, và mỗi bước xác minh bị bỏ qua đều làm trầm trọng thêm sự bất đối xứng thông tin.
+
+
+  ## Kiểm tra Kết thúc Ba Lớp ​
+
+
+
+  ## Các Khái niệm Cốt lõi ​
+
+
+  - Tuyên bố Hoàn thành Sớm : Agent khẳng định tác vụ đã hoàn thành, nhưng vẫn tồn tại các thông số kỹ thuật chưa được đáp ứng. Vấn đề cốt lõi: agent đánh giá dựa trên sự tự tin cục bộ ở cấp độ mã nguồn, trong khi tính đúng đắn ở cấp độ hệ thống đòi hỏi xác minh tổng thể.
+  - Sai lệch Hiệu chuẩn Độ Tự tin : Khoảng cách có hệ thống giữa độ tự tin hoàn thành tự báo cáo của agent và chất lượng hoàn thành thực tế. Đối với các tác vụ đa tệp phức tạp, độ lệch này rất dương—agent luôn tự tin hơn so với khả năng thực hiện thực tế. Giống như một học sinh luôn đánh giá quá cao điểm số của mình sau kỳ thi.
+  - Tiêu chí Kết thúc : Một tập hợp các điều kiện đánh giá rõ ràng, có thể thực thi được xác định trong harness. Agent phải thỏa mãn tất cả các điều kiện trước khi tuyên bố hoàn thành. "Đã xong" chuyển từ một đánh giá chủ quan sang một xác định khách quan.
+  - Cổng Kép Xác minh-Xác nhận (Verification-Validation) : Lớp xác minh đầu tiên kiểm tra "mã có triển khai chính xác hành vi được chỉ định không"; lớp xác nhận thứ hai kiểm tra "hành vi cấp hệ thống có đáp ứng các yêu cầu end-to-end không". Cả hai đều phải qua để được coi là hoàn thành.
+  - Tín hiệu Phản hồi Runtime : Nhật ký (logs), trạng thái tiến trình và kiểm tra tình trạng (health checks) từ việc thực thi chương trình. Đây là cơ sở khách quan để harness đánh giá chất lượng hoàn thành.
+  - Ràng buộc Ưu tiên Hoàn thành : Đầu tiên xác minh tính đúng đắn của chức năng, sau đó xử lý hiệu suất, và cuối cùng giải quyết phong cách. Việc tái cấu trúc (refactoring) bị cấm cho đến khi chức năng cốt lõi được xác minh.
+
+
+  ## Vượt qua Unit Test ≠ Tác vụ Hoàn thành ​
+
+
+  Đây là cạm bẫy phổ biến nhất và cũng nguy hiểm nhất. Agent đã viết mã, chạy unit test, tất cả đều xanh và nói "đã xong." Nhưng triết lý thiết kế của unit test—cô lập đơn vị được kiểm tra và giả lập (mocking) các phụ thuộc—chính xác là điều làm cho chúng không có khả năng phát hiện các vấn đề xuyên thành phần:
+
+  Không khớp Giao diện (Interface Mismatch) : Đường dẫn tệp được chuyển bởi quá trình render cho preload script là đường dẫn tương đối, nhưng preload script mong đợi đường dẫn tuyệt đối. Cả hai bài kiểm tra đơn vị tương ứng của chúng đều sử dụng mock và đã vượt qua. Vấn đề chỉ được phát hiện trong quá trình kiểm tra end-to-end. Giống như mỗi nhạc công trong một ban nhạc thực hành hoàn hảo khi chơi một mình, nhưng lại nhận ra họ đang chơi ở các tông khác nhau khi chơi cùng nhau.
+
+  Lỗi Truyền Trạng thái (State Propagation Errors) : Một quá trình migration cơ sở dữ liệu thay đổi cấu trúc bảng, nhưng lớp bộ nhớ cache ORM vẫn giữ các mục cache cho cấu trúc cũ. Unit test cung cấp một môi trường mock mới mỗi lần, điều này sẽ không để lộ sự không nhất quán trạng thái xuyên lớp này.
+
+  Phụ thuộc Môi trường (Environment Dependency) : Mã hoạt động chính xác trong môi trường test (nơi mọi thứ được mock) nhưng thất bại trong môi trường thực do sự khác biệt về cấu hình, độ trễ mạng hoặc dịch vụ không khả dụng. Giống như hát hoàn hảo trong phòng tập, nhưng gặp sự cố thiết bị âm thanh trên sân khấu.
+
+
+  ## "Nhân tiện Tái cấu trúc luôn" là Thuốc độc đối với việc Đánh giá Hoàn thành ​
+
+
+  Claude Code có một kiểu hành vi phổ biến: nó bắt đầu tái cấu trúc mã, tối ưu hóa hiệu suất và cải thiện phong cách trước khi chức năng cốt lõi vượt qua xác minh. Câu nói của Knuth, "Tối ưu hóa sớm là nguồn gốc của mọi tội lỗi," có một ý nghĩa mới trong kịch bản agent—việc tái cấu trúc làm thay đổi ranh giới giữa mã đã được xác minh và chưa được xác minh, có khả năng phá vỡ các luồng mã trước đó đã ngầm định là đúng. Giống như việc bạn chép lại các câu trả lời trắc nghiệm của mình để có định dạng đẹp hơn trước khi bạn hoàn thành các câu hỏi tự luận toán—không chỉ lãng phí thời gian mà bạn còn có thể chép sai.
+
+
+  ## Sự Sai lệch có Hệ thống trong Tự đánh giá ​
+
+
+  Anthropic đã phát hiện ra một mô hình lỗi sâu sắc hơn trong nghiên cứu năm 2026 của họ: khi một agent được yêu cầu đánh giá công việc của chính nó, nó sẽ đưa ra các đánh giá quá tích cực một cách có hệ thống—ngay cả khi một người quan sát con người sẽ coi chất lượng rõ ràng là dưới tiêu chuẩn. Điều này giống như yêu cầu một học sinh tự chấm điểm bài thi của mình—họ sẽ luôn đặc biệt khoan dung với câu trả lời của chính họ.
+
+  Vấn đề này đặc biệt nghiêm trọng trong các tác vụ mang tính chủ quan (chẳng hạn như thẩm mỹ thiết kế)—việc liệu một "bố cục có tinh tế hay không" là một cuộc gọi phán đoán, và agent có xu hướng đáng tin cậy về phía tích cực. Ngay cả đối với các tác vụ có thể xác minh kết quả, hiệu suất của agent cũng có thể bị cản trở bởi khả năng phán đoán kém.
+
+  Giải pháp không phải là làm cho agent "khách quan hơn"—cùng một mô hình tạo ra và đánh giá vốn có xu hướng hào phóng với chính nó. Giải pháp là tách "người làm" khỏi "người kiểm tra". Giống như một học sinh không nên tự chấm bài thi của mình—bạn cần một người chấm điểm độc lập.
+
+  Một agent đánh giá độc lập, được tinh chỉnh đặc biệt để "kén chọn", hiệu quả hơn nhiều so với việc để agent tạo tự đánh giá. Dữ liệu thực nghiệm từ Anthropic:
+
+  Đây là cùng một mô hình (Opus 4.5) với cùng một prompt ("xây dựng một trình chỉnh sửa trò chơi retro 2D"). Sự khác biệt duy nhất là harness—từ "chạy trần" đến "planner mở rộng yêu cầu → generator thực hiện từng tính năng → evaluator thực hiện kiểm tra nhấp chuột thực tế bằng Playwright".
+
+  > Nguồn: Anthropic: Harness design for long-running application development
+
+
+  ## Cách Ngăn chặn Việc Nộp bài Sớm ​
+
+
+
+  ## 1. Ngoại hóa việc Đánh giá Kết thúc ​
+
+
+  Việc đánh giá hoàn thành không nên do chính agent thực hiện. Harness phải thực hiện xác nhận kết thúc một cách độc lập, sử dụng các tín hiệu runtime làm đầu vào chứ không phải sự tự tin của agent. Viết rõ điều này trong CLAUDE.md :
+
+  ## Định nghĩa Hoàn thành (Definition of Done) - Tính năng hoàn thành = xác minh end-to-end đã qua, không phải "mã đã được viết" - Các cấp độ xác minh bắt buộc: 1. Unit tests pass 2. Integration tests pass 3. End-to-end flow verification passes - Không chuyển sang cấp độ 2 nếu cấp độ 1 thất bại - Không chuyển sang cấp độ 3 nếu cấp độ 2 thất bại 2. Xây dựng Xác nhận Kết thúc Ba Lớp ​ Lớp 1: Cú pháp và Phân tích Tĩnh . Chi phí thấp nhất, ít thông tin nhất, nhưng phải vượt qua. Đây là mức kiểm tra tối thiểu—bạn phải đánh vần đúng các từ trước khi chúng ta xem xét bất cứ thứ gì khác. Lớp 2: Xác minh Hành vi Runtime . Thực thi test, kiểm tra khởi động ứng dụng, xác nhận đường dẫn quan trọng. Đây là bằng chứng cốt lõi của sự hoàn thành. Chỉ viết ra thôi là chưa đủ; nó phải chạy được. Lớp 3: Xác nhận Cấp Hệ thống . Kiểm thử end-to-end, xác nhận tích hợp, mô phỏng kịch bản người dùng. Tuyến phòng thủ cuối cùng chống lại các tuyên bố sớm. Nó không chỉ phải chạy; nó phải chạy chính xác. 3. Thiết kế "Bút đỏ Đánh dấu" Tốt cho Agents ​ OpenAI đã giới thiệu một mẫu đặc biệt hiệu quả trong quá trình thực hành Codex của họ: các thông báo lỗi cho agent phải bao gồm các hướng dẫn sửa chữa . Đừng chỉ vẽ một dấu chéo đỏ lớn như một người chấm điểm lười biếng; hãy giống như một giáo viên giỏi và viết "đây là cách bạn nên thay đổi điều này" ở lề. Đừng sử dụng "Test failed" , mà hãy sử dụng "Test failed: POST /api/reset-password returned 500. Check that the email service config exists in environment variables. The template file should be at templates/reset-email.html." Phản hồi cụ thể, có thể hành động này cho phép agent tự sửa lỗi mà không cần sự can thiệp của con người.
+
+
+  ## 4. Nắm bắt các Tín hiệu Runtime ​
+
+
+  Các tín hiệu runtime hiệu quả bao gồm:
+
+  - Ứng dụng có khởi động thành công và đạt đến trạng thái sẵn sàng không?
+  - Các đường dẫn tính năng quan trọng có thực thi thành công trong runtime không?
+  - Các thao tác ghi cơ sở dữ liệu, hoạt động tệp và các hiệu ứng phụ khác có chính xác không?
+  - Các tài nguyên tạm thời có được dọn dẹp không?
+
+
+  ## Trường hợp Thực tế ​
+
+
+  Tác vụ : Triển khai chức năng đặt lại mật khẩu người dùng. Bao gồm hoạt động cơ sở dữ liệu, gửi email và sửa đổi API endpoint.
+
+  Đường dẫn nộp bài sớm : Agent sửa đổi cấu trúc cơ sở dữ liệu, viết API endpoint, thêm mẫu email, chạy unit test (qua) và tuyên bố hoàn thành. Bài kiểm tra đã được điền đầy đủ.
+
+  Các điểm trừ thực tế : (1) Luồng end-to-end chưa được kiểm tra—việc gửi và xác minh thực tế liên kết đặt lại chưa bao giờ được xác nhận. (2) Quá trình migration cơ sở dữ liệu thất bại sau khi thực thi một phần, gây ra sự không nhất quán cấu trúc. (3) Cấu hình dịch vụ email bị thiếu trong môi trường đích.
+
+  Sự can thiệp của Harness : Xác nhận kết thúc bị bắt buộc—(1) Khởi động toàn bộ ứng dụng để xác minh khả năng truy cập endpoint đặt lại; (2) Thực thi toàn bộ quy trình đặt lại; (3) Xác minh tính nhất quán của trạng thái cơ sở dữ liệu. Tất cả các khiếm khuyết đã được tìm thấy trong phiên, tiết kiệm 5-10 lần chi phí của các bản sửa lỗi sau này. Người chấm điểm độc lập đã tìm ra các vấn đề thực sự.
+
+
+  ## Những Điểm chính cần Nhớ ​
+
+
+  - Các Agent thường quá tự tin một cách có hệ thống —sai lệch hiệu chuẩn độ tự tin là một thực tế khách quan. Điền kín bài kiểm tra không có nghĩa là bạn đã làm đúng.
+  - Đánh giá hoàn thành phải được ngoại hóa —harness tự xác minh một cách độc lập; đừng tin vào "cảm giác" của agent. Học sinh không thể tự chấm bài thi của mình.
+  - Cả ba lớp xác nhận đều rất cần thiết —qua được cú pháp, qua được hành vi, qua được hệ thống, tiến triển từng lớp một.
+  - Các thông báo lỗi nên giống như việc dùng bút đỏ đánh dấu của một giáo viên giỏi —bao gồm các bước sửa chữa cụ thể để agent có thể tự sửa đổi.
+  - Không tái cấu trúc (refactoring) cho đến khi chức năng cốt lõi được xác minh —ràng buộc ưu tiên hoàn thành là chìa khóa để ngăn chặn tối ưu hóa sớm.
+
+
+  ## Đọc thêm ​
+
+
+  - On Calibration of Modern Neural Networks - Guo et al. — Chứng minh các mạng sâu hiện đại thường quá tự tin một cách có hệ thống
+  - Building Effective Agents - Anthropic — Vai trò quan trọng của bằng chứng runtime trong việc đánh giá hoàn thành
+  - Harness Engineering - OpenAI — Tuyên bố hoàn thành sớm là một trong những chế độ lỗi chính của các agent
+  - The Art of Software Testing - Myers — Tài liệu tham khảo kinh điển về phân cấp và hiệu quả của phương pháp kiểm thử
+  - Thiết kế Hàm Xác nhận Kết thúc : Thiết kế một quy trình xác nhận kết thúc hoàn chỉnh cho một tác vụ liên quan đến việc di chuyển cơ sở dữ liệu và sửa đổi API. Liệt kê các tín hiệu runtime cần thiết và các tiêu chí đạt/trượt (pass/fail) cho từng tín hiệu. Chạy nó trên một tác vụ thực tế và ghi lại những vấn đề tiềm ẩn mà nó tìm thấy.
+  - Đo lường Sai lệch Hiệu chuẩn : Chọn 10 loại tác vụ lập trình khác nhau và ghi lại độ tự tin hoàn thành tự báo cáo của agent so với chất lượng hoàn thành thực tế. Tính toán giá trị sai lệch và phân tích mối quan hệ của nó với độ phức tạp của tác vụ.
+  - Thử nghiệm Phòng thủ Đa Lớp : Chạy ba cấu hình trên cùng một bộ tác vụ—(a) chỉ phân tích tĩnh, (b) thêm unit testing, (c) xác nhận đầy đủ ba lớp. So sánh tỷ lệ các tuyên bố hoàn thành sớm và số lượng các khiếm khuyết không bị phát hiện.
 ---

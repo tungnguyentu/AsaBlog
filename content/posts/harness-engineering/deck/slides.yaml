@@ -1,0 +1,30 @@
+slides:
+  - type: title
+    n: "01 · title"
+    heading: "Harness Engineering"
+    sub: "12 lectures on agent control loops"
+    meta: "Lecture series · 2026"
+    foot: ["asa · journal", "may 2026"]
+  - type: loop
+    n: "02 · the loop"
+    heading: "The Closed Loop"
+    nodes: ["Observe", "Reason", "Act", "Verify", "Harness"]
+    accent: 4
+    caption: "Step 4 (Verify) is the return path."
+    foot: ["lecture 01", "spine diagram 01"]
+  - type: boundary
+    n: "03 · the boundary"
+    heading: "The Visibility Boundary"
+    foot: ["lecture 02", "spine diagram 02"]
+  - type: verify
+    n: "04 · verify"
+    heading: "Verify — the cheap version"
+    bullets:
+      - "Check a named property"
+      - "Not an opinion — a boolean"
+      - "Dumb verifiers compound trust"
+    foot: ["lecture 04", "rule of thumb"]
+  - type: close
+    n: "05 · close"
+    heading: "Thank you"
+    foot: ["thank you", "asa.zentry.site"]

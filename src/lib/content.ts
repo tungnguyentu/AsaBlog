@@ -22,11 +22,17 @@ export type PostWithBody = Post & { body: string };
 export type Lecture = {
   id: string;
   num: string;
-  title: string;
-  lead: string;
-  r: string;
-  note: string;
-  notes: string;
+  // bilingual fields
+  title_en: string;
+  title_vi: string;
+  lead_en: string;
+  lead_vi: string;
+  r_en: string;
+  r_vi: string;
+  note_en: string;
+  note_vi: string;
+  full_en: string;
+  full_vi: string;
 };
 
 export type DeckSlide = {
@@ -111,11 +117,47 @@ export function getLectures(postSlug: string): Lecture[] {
   return fs
     .readdirSync(lecturesDir)
     .filter((f) => f.endsWith(".mdx"))
-    .sort()
+    .sort((a, b) => {
+      // numeric sort: L2.mdx < L10.mdx
+      const n = (f: string) => parseInt(f.replace(/\D/g, ""), 10);
+      return n(a) - n(b);
+    })
     .map((f) => {
       const raw = fs.readFileSync(path.join(lecturesDir, f), "utf8");
       const { data } = matter(raw);
-      return data as Lecture;
+      const d = data as Record<string, unknown>;
+
+      // Normalize: trim block-scalar trailing newlines, apply fallbacks
+      function str(key: string, fallback = ""): string {
+        const v = d[key];
+        return typeof v === "string" ? v.trim() : fallback;
+      }
+
+      const title_en = str("title_en");
+      const title_vi = str("title_vi") || title_en;
+      const lead_en = str("lead_en");
+      const lead_vi = str("lead_vi") || lead_en;
+      const r_en = str("r_en");
+      const r_vi = str("r_vi") || r_en;
+      const note_en = str("note_en");
+      const note_vi = str("note_vi") || note_en;
+      const full_en = str("full_en") || r_en;
+      const full_vi = str("full_vi") || r_vi;
+
+      return {
+        id: str("id"),
+        num: str("num"),
+        title_en,
+        title_vi,
+        lead_en,
+        lead_vi,
+        r_en,
+        r_vi,
+        note_en,
+        note_vi,
+        full_en,
+        full_vi,
+      } satisfies Lecture;
     });
 }
 
@@ -164,11 +206,16 @@ export function buildSearchIndex(posts: Post[], lectures: Lecture[]): SearchItem
     idx.push({
       kind: "lecture",
       icon: l.id,
-      title: l.title,
-      sub: l.lead,
+      title: l.title_en,
+      sub: l.lead_en,
       meta: l.num.toLowerCase(),
       href: `/reader/harness-engineering/#${l.id}`,
-      haystack: [l.title, l.lead, l.r, l.note, l.notes].join(" ").toLowerCase(),
+      haystack: [
+        l.title_en, l.title_vi,
+        l.lead_en, l.lead_vi,
+        l.r_en, l.r_vi,
+        l.note_en, l.note_vi,
+      ].join(" ").toLowerCase(),
     });
   });
 
