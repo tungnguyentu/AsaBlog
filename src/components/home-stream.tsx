@@ -16,19 +16,6 @@ function stripMd(text: string): string {
   return text.replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").replace(/__(.*?)__/g, "$1").replace(/_(.*?)_/g, "$1");
 }
 
-// Thin horizontal rule.
-function Hairline() {
-  return (
-    <div
-      style={{
-        height: 0,
-        borderTop: "1px solid var(--rule)",
-        width: "100%",
-      }}
-    />
-  );
-}
-
 // Monospace all-caps section label.
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
@@ -440,24 +427,6 @@ export function HomeStream({ posts, tagCounts, yearCounts }: HomeStreamProps) {
                 style={{ display: "block", color: "inherit" }}
               >
                 → rss
-              </a>
-              <a
-                href="/rss.xml"
-                style={{ display: "block", color: "inherit" }}
-              >
-                → atom
-              </a>
-              <a
-                href="/rss.xml"
-                style={{ display: "block", color: "inherit" }}
-              >
-                → json feed
-              </a>
-              <a
-                href="/rss.xml"
-                style={{ display: "block", color: "inherit" }}
-              >
-                → markdown
               </a>
             </div>
           </div>

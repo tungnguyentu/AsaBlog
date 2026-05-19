@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState, useEffect, startTransition } from "react";
 
 type Theme = "warm" | "pure" | "newsprint" | "dark";
 
@@ -23,7 +23,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("theme") as Theme | null;
-    if (saved) setThemeState(saved);
+    if (saved) startTransition(() => setThemeState(saved));
   }, []);
 
   function setTheme(t: Theme) {

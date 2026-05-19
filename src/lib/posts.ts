@@ -90,7 +90,7 @@ export async function getPost(slug: string): Promise<Post | null> {
   if (!fs.existsSync(filePath)) return null;
 
   const raw = fs.readFileSync(filePath, "utf8");
-  const { data, content } = matter(raw);
+  const { content } = matter(raw);
 
   const processed = await remark().use(remarkHtml).process(content);
   const rawHtml = processed.toString();
