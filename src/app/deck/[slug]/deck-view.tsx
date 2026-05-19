@@ -3,41 +3,50 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { DeckSlide } from "@/lib/content";
+import { useLang } from "@/context/lang-context";
 
 type Props = { slides: DeckSlide[] };
 
-function SlideBody({ slide }: { slide: DeckSlide }) {
+const SLIDE_COPY = {
+  en: {
+    title:    { h: ["Harness", "Engineering."], sub: "Twelve short lectures on the loop that turns a model into a worker." },
+    loop:     { h: ["Every harness is a ", "closed", " loop."], nodes: ["Intent","Plan","Execute","Verify","Record"] },
+    boundary: { h: ["Whatever the agent can't see,", "it cannot reason about."], sub: "Drawing the visibility boundary is half the design work. Tools, memory, and context are not features — they're the surface of the world the agent inhabits." },
+    verify:   { h: "Verification doesn't have to be smart.", bullets: ["It has to be specific: a named property, not a vibe-check.", "Dumb verifiers compound trust. Smart verifiers can wait.", "No status, no progress. Status is the only progress that counts."] },
+    close:    { q: "Closing the loop is the only progress that counts.", cite: "— asa · journal vol. iii" },
+  },
+  vi: {
+    title:    { h: ["Harness", "Engineering."], sub: "Mười hai bài giảng ngắn về vòng lặp biến mô hình thành người thực thi." },
+    loop:     { h: ["Mỗi harness là một vòng lặp ", "khép kín", "."], nodes: ["Dự định","Lập kế hoạch","Thực thi","Xác minh","Ghi lại"] },
+    boundary: { h: ["Những gì agent không thể thấy,", "nó không thể lý luận về."], sub: "Vẽ ranh giới hiển thị là một nửa công việc thiết kế. Công cụ, bộ nhớ và ngữ cảnh không phải là tính năng — chúng là bề mặt thế giới mà agent sinh sống." },
+    verify:   { h: "Xác minh không cần phải thông minh.", bullets: ["Nó phải cụ thể: một thuộc tính được đặt tên, không phải cảm tính.", "Các bộ xác minh đơn giản tích lũy niềm tin. Bộ thông minh có thể chờ đợi.", "Không có trạng thái, không có tiến độ. Trạng thái là tiến độ duy nhất có giá trị."] },
+    close:    { q: "Đóng vòng lặp là tiến độ duy nhất có giá trị.", cite: "— asa · nhật ký tập iii" },
+  },
+};
+
+function SlideBody({ slide, lang }: { slide: DeckSlide; lang: "en" | "vi" }) {
+  const c = SLIDE_COPY[lang];
+
   switch (slide.type) {
     case "title":
       return (
         <>
-          <h1>
-            Harness
-            <br />
-            Engineering.
-          </h1>
-          <p className="sub">
-            Twelve short lectures on the loop that turns a model into a worker.
-          </p>
+          <h1>{c.title.h[0]}<br />{c.title.h[1]}</h1>
+          <p className="sub">{c.title.sub}</p>
         </>
       );
 
     case "loop":
       return (
         <>
-          <h1>
-            Every harness is a <em>closed</em> loop.
-          </h1>
+          <h1>{c.loop.h[0]}<em>{c.loop.h[1]}</em>{c.loop.h[2]}</h1>
           <div className="flow-row">
-            <span className="node">Intent</span>
-            <span className="arr">→</span>
-            <span className="node">Plan</span>
-            <span className="arr">→</span>
-            <span className="node">Execute</span>
-            <span className="arr">→</span>
-            <span className="node strong">Verify</span>
-            <span className="arr">→</span>
-            <span className="node strong">Record</span>
+            {c.loop.nodes.map((node, i) => (
+              <>
+                <span key={node} className={"node" + (i >= 3 ? " strong" : "")}>{node}</span>
+                {i < c.loop.nodes.length - 1 && <span className="arr">→</span>}
+              </>
+            ))}
             <span className="arr">↺</span>
           </div>
         </>
@@ -46,32 +55,17 @@ function SlideBody({ slide }: { slide: DeckSlide }) {
     case "boundary":
       return (
         <>
-          <h1>
-            Whatever the agent can&apos;t see,
-            <br />
-            <em>it cannot reason about.</em>
-          </h1>
-          <p className="sub">
-            Drawing the visibility boundary is half the design work. Tools,
-            memory, and context are not features — they&apos;re the surface of
-            the world the agent inhabits.
-          </p>
+          <h1>{c.boundary.h[0]}<br /><em>{c.boundary.h[1]}</em></h1>
+          <p className="sub">{c.boundary.sub}</p>
         </>
       );
 
     case "verify":
       return (
         <>
-          <h1>Verification doesn&apos;t have to be smart.</h1>
+          <h1>{c.verify.h}</h1>
           <ul className="bullets">
-            <li>
-              It has to be <em>specific</em>: a named property, not a
-              vibe-check.
-            </li>
-            <li>Dumb verifiers compound trust. Smart verifiers can wait.</li>
-            <li>
-              No status, no progress. Status is the only progress that counts.
-            </li>
+            {c.verify.bullets.map((b, i) => <li key={i}>{b}</li>)}
           </ul>
         </>
       );
@@ -79,14 +73,15 @@ function SlideBody({ slide }: { slide: DeckSlide }) {
     case "close":
       return (
         <div className="quote">
-          Closing the loop is the only progress that counts.
-          <cite>— asa · journal vol. iii</cite>
+          {c.close.q}
+          <cite>{c.close.cite}</cite>
         </div>
       );
   }
 }
 
 export default function DeckPage({ slides }: Props) {
+  const { lang } = useLang();
   const [idx, setIdx] = useState(0);
   const last = slides.length - 1;
 
@@ -130,7 +125,9 @@ export default function DeckPage({ slides }: Props) {
 
         <header className="post-head" style={{ paddingBottom: 20 }}>
           <div className="date">
-            slide deck · {slides.length} slides · ←/→ to navigate
+            {lang === "vi"
+              ? `slide deck · ${slides.length} trang · ←/→ để điều hướng`
+              : `slide deck · ${slides.length} slides · ←/→ to navigate`}
           </div>
           <h1 style={{ fontSize: "clamp(28px, 3.6vw, 40px)", marginBottom: 8 }}>
             Harness Engineering — slide deck.
@@ -153,7 +150,7 @@ export default function DeckPage({ slides }: Props) {
                   <span>{s.n}</span>
                 </div>
 
-                <SlideBody slide={s} />
+                <SlideBody slide={s} lang={lang} />
 
                 <div className="foot">
                   {/* foot is [string, string] in YAML — cast from unknown index signature */}

@@ -6,38 +6,32 @@ import type { Post } from "@/lib/content";
 import { useLang } from "@/context/lang-context";
 
 const EN_COPY = {
-  kicker: "journal · vol. iii · 2026",
-  h1a: "Field notes from building",
-  h1b: "quiet, observable",
-  h1c: ", stubbornly verifiable software.",
-  subBefore: "A small log by ",
-  subAfter:
-    " — short essays, diagrams, and the occasional slide deck. Mostly about agent harnesses, control loops, and what stays after the demo ends.",
-  metaA: (n: number) => `${String(n).padStart(2, "0")} ${n === 1 ? "entry" : "entries"}`,
-  metaB: "updated 18·05·26",
-  metaC: "english · tiếng việt",
+  introH: ["Field notes on quiet, ", "verifiable", " software."],
+  introP: "A small log — short essays on agent harnesses, control loops, and what stays after the demo ends.",
+  seriesLabel: "in series",
+  seriesTitle: "Harness Engineering — twelve lectures on the loop.",
+  seriesDesc: "The closed loop, the visibility boundary, the state machine — and nine more lectures on what makes an agent harness keep working in the wild.",
+  seriesMeta: "essay · reader · deck",
+  seriesResume: "resume reading →",
   section: "recent writing",
   filterLbl: "filter",
 };
 
 const VI_COPY = {
-  kicker: "nhật ký · tập iii · 2026",
-  h1a: "Ghi chép từ việc xây",
-  h1b: "phần mềm yên tĩnh, quan sát được",
-  h1c: ", và bướng bỉnh dễ kiểm chứng.",
-  subBefore: "Một sổ tay nhỏ của ",
-  subAfter:
-    " — bài ngắn, sơ đồ, và đôi khi là slide deck. Chủ yếu về agent harness, vòng điều khiển, và những gì còn lại sau khi demo kết thúc.",
-  metaA: (n: number) => `${String(n).padStart(2, "0")} bài viết`,
-  metaB: "cập nhật 18·05·26",
-  metaC: "english · tiếng việt",
+  introH: ["Ghi chép về phần mềm yên tĩnh, ", "có thể kiểm chứng", "."],
+  introP: "Nhật ký nhỏ — bài ngắn về agent harness, vòng điều khiển, và những gì còn lại sau khi demo kết thúc.",
+  seriesLabel: "loạt bài",
+  seriesTitle: "Harness Engineering — mười hai bài giảng về vòng lặp.",
+  seriesDesc: "Vòng lặp khép kín, ranh giới hiển thị, máy trạng thái — và chín bài giảng nữa về cách agent harness hoạt động trong thực tế.",
+  seriesMeta: "essay · reader · deck",
+  seriesResume: "tiếp tục đọc →",
   section: "bài viết gần đây",
   filterLbl: "lọc",
 };
 
-type Props = { posts: Post[] };
+type Props = { posts: Post[]; lectureCount: number };
 
-export default function HomeView({ posts }: Props) {
+export default function HomeView({ posts, lectureCount }: Props) {
   const { lang } = useLang();
   const copy = lang === "vi" ? VI_COPY : EN_COPY;
 
@@ -56,33 +50,53 @@ export default function HomeView({ posts }: Props) {
 
   return (
     <main className="page">
-      {/* Hero */}
-      <section className="container hero">
-        <div className="hero-kicker">
-          <span className="pulse" />
-          <span>{copy.kicker}</span>
-        </div>
-        <h1 className="serif">
-          {copy.h1a}
-          <br />
-          <em>{copy.h1b}</em>
-          <span className="ink-soft">{copy.h1c}</span>
-        </h1>
-        <p className="hero-sub">
-          {copy.subBefore}
-          <span style={{ color: "var(--ink)" }}>Asa</span>
-          {copy.subAfter}
-        </p>
-        <div className="hero-meta">
-          <span>{copy.metaA(posts.length)}</span>
-          <span className="sep" />
-          <span>{copy.metaB}</span>
-          <span className="sep" />
-          <span>{copy.metaC}</span>
+      <section className="container">
+        <div className="intro">
+          <h1 className="serif">
+            {copy.introH[0]}<em>{copy.introH[1]}</em>{copy.introH[2]}
+          </h1>
+          <p>{copy.introP}</p>
         </div>
       </section>
 
       <section className="container">
+        {/* Series card */}
+        <div className="section-rule">
+          <h2>{copy.seriesLabel}</h2>
+          <span className="count">{lectureCount} / 12</span>
+        </div>
+        <Link href="/post/harness-engineering/" className="series-card" style={{ display: "grid" }}>
+          <div>
+            <div className="kicker">
+              <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }} />
+              {" "}series · ongoing · 2026
+            </div>
+            <h3>{copy.seriesTitle}</h3>
+            <p>{copy.seriesDesc}</p>
+            <div className="meta-row">
+              <span>{copy.seriesMeta}</span>
+              <span className="sep" />
+              <span>≈ 32 min</span>
+              <span className="sep" />
+              <span>en · vi</span>
+            </div>
+          </div>
+          <div className="series-progress">
+            <div>
+              <div className="frac">
+                <em>{String(lectureCount).padStart(2, "0")}</em>/{12}
+              </div>
+              <div className="label">lectures published</div>
+            </div>
+            <div className="ladder" aria-hidden="true">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <span key={i} className={i < lectureCount ? "done" : ""} />
+              ))}
+            </div>
+            <div className="label">{copy.seriesResume}</div>
+          </div>
+        </Link>
+
         {/* Post list */}
         <div className="section-rule">
           <h2>{copy.section}</h2>
@@ -110,12 +124,7 @@ export default function HomeView({ posts }: Props) {
           {visiblePosts.map((p) => {
             const inner = (
               <>
-                <div className="post-date">
-                  <b>
-                    {p.dateShort.m} {p.dateShort.d}
-                  </b>
-                  <span>{p.readLabel}</span>
-                </div>
+                <span className="post-date">{p.dateShort.m} {p.dateShort.d}</span>
                 <div>
                   <h3 className="post-title">{p.title}</h3>
                   <p className="post-excerpt">{p.excerpt}</p>
@@ -134,16 +143,12 @@ export default function HomeView({ posts }: Props) {
                       </span>
                     ))}
                     {p.placeholder && (
-                      <span
-                        className="tag"
-                        style={{ color: "var(--ink-mute)" }}
-                      >
+                      <span className="tag" style={{ color: "var(--ink-mute)" }}>
                         draft
                       </span>
                     )}
                   </div>
                 </div>
-                <span className="post-arrow">›</span>
               </>
             );
 

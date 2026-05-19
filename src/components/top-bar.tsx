@@ -55,13 +55,10 @@ export function TopBar({ onOpenSearch }: Props) {
     <header className="topbar">
       <div className="topbar-inner">
         <Link className="brand" href="/">
-          <span className="brand-mark" aria-hidden="true" />
-          <span>
-            Asa
-            <span className="brand-dot" />
-            <span className="ink-soft" style={{ fontWeight: 400, fontStyle: "italic" }}>
-              notes &amp; decks
-            </span>
+          Asa
+          <span className="brand-dot" />
+          <span className="ink-soft" style={{ fontWeight: 400, fontStyle: "italic", fontSize: 15 }}>
+            journal
           </span>
         </Link>
 
